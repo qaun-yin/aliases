@@ -33,5 +33,6 @@ echo "Run: nano .env"
 
 ## Run program (uncomment after configuring .env)
 
-# python -m "$ENV_NAME"
-#python3 -m "$ENV_NAME"
+# python -m autogpt
+# Or use: python scripts/main.py
+
