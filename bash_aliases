@@ -93,4 +93,4 @@ alias zerotier-cli="sudo zerotier-cli"
 
 ## AI Stuff
 
-alias automode=""
+# alias automode=""  # TODO: Add automode command

@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 spinner() {
   local pid=$1
   local delay=0.15
-  local spin='|/-\'
+  local spin='|/-\\'
   while kill -0 "$pid" 2>/dev/null; do
     for i in {0..3}; do
       printf "\r[%s] " "${spin:$i:1}"
