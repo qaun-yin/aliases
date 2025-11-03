@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 #
 # tailscale_manager.sh
-#
-# A script to install, uninstall, and configure Tailscale
-# on Debian/Ubuntu-based systems, with options for headless
-# or web-based authentication, and optional exit node setup.
+# Cross-platform installer/configurator for Tailscale (Linux + macOS)
 
 ###############################################################################
 # UTILITY FUNCTIONS
 ###############################################################################
 
 check_root() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS doesn't require root for Homebrew installs, only for systemctl-like actions
+    return
+  fi
   if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root (use sudo). Exiting."
     exit 1
@@ -22,52 +23,65 @@ press_enter_to_continue() {
   read -r -p "Press ENTER to continue..."
 }
 
+detect_os() {
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    OS="linux"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="macos"
+  else
+    echo "Unsupported operating system: $OSTYPE"
+    exit 1
+  fi
+}
+
 ###############################################################################
 # TAILSCALE INSTALL/UNINSTALL
 ###############################################################################
 
 install_tailscale() {
-  echo "Installing Tailscale via apt..."
+  if [[ $OS == "linux" ]]; then
+    echo "Installing Tailscale on Linux via apt..."
+    rm -f /etc/apt/sources.list.d/tailscale.list
+    apt-key list | grep -q "Tailscale" && apt-key del "$(apt-key list | awk '/Tailscale/{key=$2; gsub(/.*\//,"",key); print key}')"
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list
+    apt-get update
+    apt-get install -y tailscale
+    systemctl enable tailscaled
+    systemctl start tailscaled
 
-  # 1. Remove any leftover Tailscale repo list or keys (clean slate)
-  rm -f /etc/apt/sources.list.d/tailscale.list
-  apt-key list | grep -q "Tailscale" && apt-key del "$(apt-key list | awk '/Tailscale/{key=$2; gsub(/.*\//,"",key); print key}')"
-
-  # 2. Add Tailscale’s official stable repository
-  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -
-  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list
-
-  # 3. Update and install
-  apt-get update
-  apt-get install -y tailscale
-
-  # 4. Enable and start the service
-  systemctl enable tailscaled
-  systemctl start tailscaled
+  elif [[ $OS == "macos" ]]; then
+    echo "Installing Tailscale on macOS via Homebrew..."
+    if ! command -v brew &>/dev/null; then
+      echo "Homebrew not found. Installing Homebrew first..."
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+    brew install --cask tailscale
+    sudo tailscale up
+  fi
 
   echo "Tailscale installation complete."
 }
 
 uninstall_tailscale() {
-  echo "Uninstalling and purging Tailscale..."
+  if [[ $OS == "linux" ]]; then
+    echo "Uninstalling Tailscale on Linux..."
+    systemctl stop tailscaled
+    systemctl disable tailscaled
+    apt-get purge -y tailscale
+    apt-get autoremove -y
+    rm -rf /var/lib/tailscale* /etc/default/tailscaled /etc/systemd/system/tailscaled.service.d
+    rm -f /etc/apt/sources.list.d/tailscale.list
+    apt-key list | grep -q "Tailscale" && apt-key del "$(apt-key list | awk '/Tailscale/{key=$2; gsub(/.*\//,"",key); print key}')"
+    apt-get update
 
-  # 1. Stop and disable the daemon
-  systemctl stop tailscaled
-  systemctl disable tailscaled
+  elif [[ $OS == "macos" ]]; then
+    echo "Uninstalling Tailscale on macOS..."
+    brew uninstall --cask tailscale || true
+    sudo rm -rf /Applications/Tailscale.app ~/Library/Preferences/com.tailscale*
+  fi
 
-  # 2. Remove Tailscale package
-  apt-get purge -y tailscale
-  apt-get autoremove -y
-
-  # 3. Remove leftover state/config files
-  rm -rf /var/lib/tailscale* /etc/default/tailscaled /etc/systemd/system/tailscaled.service.d
-
-  # 4. Remove the Tailscale repository
-  rm -f /etc/apt/sources.list.d/tailscale.list
-  apt-key list | grep -q "Tailscale" && apt-key del "$(apt-key list | awk '/Tailscale/{key=$2; gsub(/.*\//,"",key); print key}')"
-  apt-get update
-
-  echo "Tailscale has been completely removed."
+  echo "Tailscale has been removed."
 }
 
 ###############################################################################
@@ -76,41 +90,25 @@ uninstall_tailscale() {
 
 configure_web_auth() {
   echo "Configuring Tailscale with web-based authentication..."
-  # Force fresh login
   tailscale logout 2>/dev/null
-  systemctl stop tailscaled
-  rm -rf /var/lib/tailscale
-  systemctl start tailscaled
-
-  # --reset ensures no stale settings
   tailscale up --reset --force-reauth
   echo
-  echo "If a URL is provided above, copy/paste it in your browser to authenticate."
-  echo "After authenticating, check https://login.tailscale.com/admin/machines to approve or confirm the device."
+  echo "If a URL is shown, open it in your browser to authenticate."
 }
 
 configure_headless_auth() {
-  echo "Configuring Tailscale with a headless Auth Key..."
+  echo "Configuring Tailscale with headless Auth Key..."
   read -r -p "Enter your Tailscale Auth Key (tskey-...): " AUTHKEY
-  if [[ -z "$AUTHKEY" ]]; then
-    echo "No Auth Key entered. Returning to main menu."
-    return
-  fi
-
+  [[ -z "$AUTHKEY" ]] && echo "No key entered. Returning." && return
   tailscale logout 2>/dev/null
-  systemctl stop tailscaled
-  rm -rf /var/lib/tailscale
-  systemctl start tailscaled
-
   tailscale up --reset --authkey "$AUTHKEY"
-  echo
-  echo "Headless authentication attempted. Check https://login.tailscale.com/admin/machines to confirm the device is active."
+  echo "Headless authentication attempted. Check your admin console."
 }
 
 advertise_exit_node() {
   echo "Advertising this machine as an exit node..."
   tailscale up --advertise-exit-node
-  echo "Exit node advertised. In the Tailscale admin console, enable exit node for this machine if required."
+  echo "Exit node advertised. Enable it in the admin console if required."
 }
 
 ###############################################################################
@@ -129,7 +127,6 @@ configure_menu() {
     echo "4) Return to Main Menu"
     echo "======================================================="
     read -r -p "Select an option [1-4]: " config_choice
-
     case "$config_choice" in
       1) configure_web_auth; press_enter_to_continue ;;
       2) configure_headless_auth; press_enter_to_continue ;;
@@ -144,7 +141,7 @@ main_menu() {
   while true; do
     clear
     echo "======================================================="
-    echo " TAILSCALE MANAGER"
+    echo " TAILSCALE MANAGER ($OS)"
     echo "======================================================="
     echo "1) Install Tailscale"
     echo "2) Uninstall Tailscale"
@@ -152,7 +149,6 @@ main_menu() {
     echo "4) Quit"
     echo "======================================================="
     read -r -p "Select an option [1-4]: " choice
-
     case "$choice" in
       1) install_tailscale; press_enter_to_continue ;;
       2) uninstall_tailscale; press_enter_to_continue ;;
@@ -164,8 +160,9 @@ main_menu() {
 }
 
 ###############################################################################
-# SCRIPT ENTRY POINT
+# ENTRY POINT
 ###############################################################################
 
+detect_os
 check_root
 main_menu
