@@ -2,6 +2,34 @@
 """
 C-MGMT — Container Management Wizard (Full with Environment-Aware Auto-Detect)
 
+Brief description of what the script does
+
+This script provides a comprehensive container management interface for Docker environments.
+It offers multiple modes including backup, update, removal, and status reporting functions.
+The script automatically detects the execution environment and adjusts its behavior accordingly.
+
+Features:
+- Environment-aware auto-detection (Canvas/CLI mode)
+- Container backup functionality
+- Container update management
+- Comprehensive resource removal (containers, images, volumes, networks)
+- Status reporting
+- Self-testing capabilities
+- Non-interactive mode support
+- Job management with background processing
+
+Requirements:
+- Python 3.6+
+- Docker installed and accessible
+- Appropriate permissions for Docker operations
+
+Usage:
+python3 c-mgmt.py
+
+Examples:
+python3 c-mgmt.py
+python3 c-mgmt.py --self-test
+
 Fixes & updates in this revision:
 - Prevents Canvas from surfacing `SystemExit` as an error by **not calling
   `sys.exit`** unless we're on a real TTY or `CMGMT_EXIT=1` is set.

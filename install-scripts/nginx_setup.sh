@@ -1,5 +1,32 @@
 #!/bin/bash
 
+# NGINX Setup Script
+# Brief description of what the script does
+#
+# This script automates the installation and configuration of NGINX web server with SSL support.
+# It configures virtual hosts, sets up SSL certificates, and integrates with ZeroTier networking.
+# The script also provides options to install additional tools like Certbot, Docker, and ZeroTier.
+#
+# Requirements:
+# - Ubuntu/Debian-based system
+# - Root privileges (sudo)
+# - Internet connectivity
+# - ZeroTier network membership (optional)
+#
+# Usage:
+# sudo ./nginx_setup.sh
+#
+# Examples:
+# sudo ./nginx_setup.sh
+#
+# Features:
+# - Automated NGINX installation
+# - Virtual host configuration
+# - SSL certificate setup
+# - ZeroTier network integration
+# - Optional tool installation (Certbot, Docker, ZeroTier)
+# - DNS configuration guidance
+#
 # Ensure the script is run as root
 if [ "$EUID" -ne 0 ]; then
     echo "ERROR: This script must be run as root. Please use sudo."

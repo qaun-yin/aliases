@@ -1,96 +1,128 @@
-## System Administration
+# =============================================================================
+# BASH ALIASES - Enhanced Command Shortcuts
+# =============================================================================
 
-alias ebash="nano ~/.bash_aliases"
-alias sbash="source ~/.bashrc"
-alias cl="clear"
-alias update="sudo apt-get update"
-alias upgrade="sudo apt-get upgrade"
-alias goget="sudo apt-get install"
-alias clean="sudo apt-get clean; sudo apt-get autoclean; sudo apt-get autoremove"
-alias reboot="sudo reboot"
-alias shutdown="sudo shutdown -h now"
-alias sysinfo="sudo lshw -short"
-alias sysctls="sudo systemctl status"
-alias sysctlr="sudo systemctl restart"
-alias snano="sudo nano"
-alias svi="sudo vi"
-alias srcbash="source ~/.bashrc"
-alias srczsh="source ~/.zshrc"
-alias srcprofile="source ~/.profile"
-alias srcaliases="source ~/.aliases"
-alias editbash="nano ~/.bashrc"
-alias editzsh="nano ~/.zshrc"
-alias editprofile="nano ~/.profile"
-alias editaliases="nano ~/.bash_aliases"
-alias q="quit"
-alias e="exit"
-alias off="sudo shutdown -h now"
+# -----------------------------------------------------------------------------
+# SYSTEM ADMINISTRATION - System management and maintenance commands
+# -----------------------------------------------------------------------------
 
-## Networking
+# Bash configuration management
+alias ebash="nano ~/.bash_aliases"                    # Edit bash aliases file
+alias sbash="source ~/.bashrc"                        # Reload bash configuration
+alias srcbash="source ~/.bashrc"                      # Source bashrc file
+alias srczsh="source ~/.zshrc"                        # Source zshrc file
+alias srcprofile="source ~/.profile"                  # Source profile file
+alias srcaliases="source ~/.aliases"                  # Source aliases file
+alias editbash="nano ~/.bashrc"                       # Edit bashrc file
+alias editzsh="nano ~/.zshrc"                         # Edit zshrc file
+alias editprofile="nano ~/.profile"                   # Edit profile file
+alias editaliases="nano ~/.bash_aliases"              # Edit aliases file
 
-alias ip="ifconfig"
-alias ip4="ifconfig | grep 'inet ' | grep -v 'inet6 '"
-alias ip6="ifconfig | grep 'inet6 '"
-alias ip4only="ifconfig | grep 'inet ' | grep -v 'inet6 ' | awk '{print $2}'"
-alias ip6only="ifconfig | grep 'inet6 ' | awk '{print $2}'"
-alias ip4public="curl -s http://ipecho.net/plain; echo"
-alias ip6public="curl -s http://ipv6.icanhazip.com; echo"
-alias ippublic="curl -s http://ipecho.net/plain; echo"
-alias iplocal="ip addr show | grep 'inet ' | grep -v 'inet6 ' | grep -v '"
-alias p1="ping 1.1.1.1"
-alias tr1="traceroute 1.1.1.1"
-alias dg="dig google.com"
-alias ns="nslookup google.com"
-alias ufw="sudo ufw"
-alias ufws="sudo ufw status"
-alias ufwa="sudo ufw allow"
-alias ufwd="sudo ufw deny"
+# System operations
+alias cl="clear"                                      # Clear terminal screen
+alias update="sudo apt-get update"                    # Update package lists
+alias upgrade="sudo apt-get upgrade"                  # Upgrade installed packages
+alias goget="sudo apt-get install"                    # Install packages
+alias clean="sudo apt-get clean; sudo apt-get autoclean; sudo apt-get autoremove"  # Clean package cache
+alias reboot="sudo reboot"                            # Reboot system
+alias shutdown="sudo shutdown -h now"                 # Shutdown system immediately
+alias off="sudo shutdown -h now"                      # Shutdown system (alternative)
+alias sysinfo="sudo lshw -short"                      # Display hardware information
+alias sysctls="sudo systemctl status"                 # View systemd service status
+alias sysctlr="sudo systemctl restart"                # Restart systemd service
+alias q="quit"                                        # Quit command
+alias e="exit"                                        # Exit current session
 
-## Git
+# File editing with elevated privileges
+alias snano="sudo nano"                               # Edit files with nano as root
+alias svi="sudo vi"                                   # Edit files with vi as root
 
-alias g="git"
-alias gs="git status"
-alias ga="git add"
-alias gc="git commit"
-alias gcl="git clone"
-alias gcm="git commit -m"
-alias gca="git commit -a"
-alias gcam="git commit -am"
-alias gp="git push"
-alias gpl="git pull"
-alias gplm="git pull origin master"
-alias gps="git push origin main"
-alias gpsm="git push origin master"
+# -----------------------------------------------------------------------------
+# NETWORKING - Network configuration and diagnostics
+# -----------------------------------------------------------------------------
 
-## Docker
+# IP address information
+alias ip="ifconfig"                                   # Display network interface information
+alias ip4="ifconfig | grep 'inet ' | grep -v 'inet6 '"  # Show IPv4 addresses only
+alias ip6="ifconfig | grep 'inet6 '"                  # Show IPv6 addresses only
+alias ip4only="ifconfig | grep 'inet ' | grep -v 'inet6 ' | awk '{print $2}'"  # Show IPv4 addresses only (values)
+alias ip6only="ifconfig | grep 'inet6 ' | awk '{print $2}'"  # Show IPv6 addresses only (values)
+alias ip4public="curl -s http://ipecho.net/plain; echo"  # Show public IPv4 address
+alias ip6public="curl -s http://ipv6.icanhazip.com; echo"  # Show public IPv6 address
+alias ippublic="curl -s http://ipecho.net/plain; echo"  # Show public IP address
+alias iplocal="ip addr show | grep 'inet ' | grep -v 'inet6 ' | grep -v '127.0.0.1'"  # Show local IP addresses
 
-alias d="docker"
-alias dc="docker-compose"
-alias dps="docker ps -a"
-alias ds="docker status"
-alias ldoc="sudo lazydocker"
+# Network diagnostics
+alias p1="ping 1.1.1.1"                               # Ping Cloudflare DNS
+alias tr1="traceroute 1.1.1.1"                        # Traceroute to Cloudflare DNS
+alias dg="dig google.com"                             # DNS lookup for Google
+alias ns="nslookup google.com"                        # Name server lookup for Google
 
-## TMUX
+# Firewall management
+alias ufw="sudo ufw"                                  # Uncomplicated Firewall command
+alias ufws="sudo ufw status"                          # Show firewall status
+alias ufwa="sudo ufw allow"                           # Allow traffic through firewall
+alias ufwd="sudo ufw deny"                            # Deny traffic through firewall
 
-alias t="tmux"
-alias ta="tmux attach"
-alias tl="tmux ls"
-alias tmn="tmux new -s"
-alias tma="tmux attach -t"
-alias tmd="tmux detach"
-alias tmk="tmux kill-session -t"
+# -----------------------------------------------------------------------------
+# GIT - Version control system shortcuts
+# -----------------------------------------------------------------------------
 
-## ZeroTier
+alias g="git"                                         # Git command shortcut
+alias gs="git status"                                 # Show git repository status
+alias ga="git add"                                    # Add files to git staging
+alias gc="git commit"                                 # Commit staged changes
+alias gcl="git clone"                                 # Clone a repository
+alias gcm="git commit -m"                             # Commit with message
+alias gca="git commit -a"                             # Commit all tracked files
+alias gcam="git commit -am"                           # Commit all with message
+alias gp="git push"                                   # Push changes to remote
+alias gpl="git pull"                                  # Pull changes from remote
+alias gplm="git pull origin master"                   # Pull from origin master
+alias gps="git push origin main"                      # Push to origin main
+alias gpsm="git push origin master"                   # Push to origin master
 
-alias zt="sudo zerotier-cli"
-alias ztj="sudo zerotier-cli join"
-alias ztl="sudo zerotier-cli listnetworks"
-alias zti="sudo zerotier-cli info"
-alias zts="sudo zerotier-cli status"
-alias ztq="sudo zerotier-cli leave"
-alias ztqr="sudo zerotier-cli leave -r"
-alias zerotier-cli="sudo zerotier-cli"
+# -----------------------------------------------------------------------------
+# DOCKER - Container management shortcuts
+# -----------------------------------------------------------------------------
 
-## AI Stuff
+alias d="docker"                                      # Docker command shortcut
+alias dc="docker-compose"                             # Docker Compose command
+alias dps="docker ps -a"                              # List all docker containers
+alias ds="docker status"                              # Show docker status
+alias ldoc="sudo lazydocker"                          # Launch LazyDocker terminal UI
+
+# -----------------------------------------------------------------------------
+# TMUX - Terminal multiplexer shortcuts
+# -----------------------------------------------------------------------------
+
+alias t="tmux"                                        # Tmux command shortcut
+alias ta="tmux attach"                                # Attach to tmux session
+alias tl="tmux ls"                                    # List tmux sessions
+alias tmn="tmux new -s"                               # Create new tmux session
+alias tma="tmux attach -t"                            # Attach to specific tmux session
+alias tmd="tmux detach"                               # Detach from tmux session
+alias tmk="tmux kill-session -t"                      # Kill specific tmux session
+
+# -----------------------------------------------------------------------------
+# ZEROTIER - Software-defined networking shortcuts
+# -----------------------------------------------------------------------------
+
+alias zt="sudo zerotier-cli"                          # ZeroTier command line interface
+alias ztj="sudo zerotier-cli join"                    # Join ZeroTier network
+alias ztl="sudo zerotier-cli listnetworks"            # List joined networks
+alias zti="sudo zerotier-cli info"                    # Show ZeroTier information
+alias zts="sudo zerotier-cli status"                  # Show ZeroTier status
+alias ztq="sudo zerotier-cli leave"                   # Leave ZeroTier network
+alias ztqr="sudo zerotier-cli leave -r"               # Leave network with reset
+alias zerotier-cli="sudo zerotier-cli"                # ZeroTier CLI (full command)
+
+# -----------------------------------------------------------------------------
+# AI STUFF - Artificial intelligence and automation tools
+# -----------------------------------------------------------------------------
 
 # alias automode=""  # TODO: Add automode command
+
+# =============================================================================
+# END OF BASH ALIASES
+# =============================================================================

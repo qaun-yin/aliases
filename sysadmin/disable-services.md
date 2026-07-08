@@ -1,6 +1,6 @@
 # Disable or Remove CUPS
 
-[Cupsd](http://manpages.ubuntu.com/manpages/bionic/man8/cups-browsed.8.html) is a scheduler for CUPS, a service used by applications to interface with printers. There are several [Nmap NSE scripts](https://null-byte.wonderhowto.com/how-to/hack-like-pro-using-nmap-scripting-engine-nse-for-reconnaissance-0158681/) designed to pull information from CUPS services and pose a very minor security risk. However, if you very rarely need to interact with printers, CUPS can be disabled using the below [systemctl ](http://manpages.ubuntu.com/manpages/bionic/man1/systemctl.1.html) disable cups-browsed command. The changes will take effect after a reboot.
+[Cupsd](http://manpages.ubuntu.com/manpages/bionic/man8/cups-browsed.8.html) is a scheduler for CUPS, a service used by applications to interface with printers. There are several [Nmap NSE scripts](https://null-byte.wonderhowto.com/how-to/hack-like-pro-using-nmap-scripting-engine-nse-for-reconnaissance-0158681/) designed to pull information from CUPS services and pose a very minor security risk. However, if you very rarely need to interact with printers, CUPS can be disabled using the below [systemctl](http://manpages.ubuntu.com/manpages/bionic/man1/systemctl.1.html) disable cups-browsed command. The changes will take effect after a reboot.
 
 ```bash
 systemctl disable cups-browsed
@@ -29,4 +29,3 @@ _Avahi can also be completely removed with sudo apt purge avahi-daemon._
 ```bash
 sudo apt purge avahi-daemon
 ```
-

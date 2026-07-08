@@ -1,16 +1,17 @@
 # Setting up ZeroTier as a default ethernet interface
 
-
 ## Step 1: Install ZeroTier
 
 Install ZeroTier on your gateway, join your network and authorize it, and then configure it as a basic IPv4 NAT router
 
 /etc/sysctl.conf
+
 ```
 net.ipv4.ip_forward = 1
 ```
 
 /etc/sysconfig/iptables
+
 ```
 *nat
 :PREROUTING ACCEPT [0:0]
@@ -30,7 +31,7 @@ COMMIT
 
 Our net is 10.6.4.0/22. You will want to change this to whatever IPv4 scheme you use. Also change 45.32.69.220 in the SNAT line to the public IP of the gateway.
 
-If your "router" doesn't not have a public IP address, you may use masquerade instead of SNAT. See the end of the article. 
+If your "router" doesn't not have a public IP address, you may use masquerade instead of SNAT. See the end of the article.
 The /etc/sysconfig/iptables file depends on the iptables-services package on CentOS/Fedora:
 
 ```
@@ -39,7 +40,7 @@ systemctl enable iptables
 systemctl start iptables
 ```
 
-## Step 2: Add default route 
+## Step 2: Add default route
 
 Log into ZeroTier Central and add a route to 0.0.0.0/0 via the IP address of your new virtual edge router.
 
@@ -59,7 +60,7 @@ To limit such dangerous network settings we've introduce local network permissio
 sudo zerotier-cli set <networkId> allowDefault=1
 ```
 
-Once you've set these options, try hitting http://ifconfig.io/ and checking your external IP. On some OSes you may have to restart your web browser and other apps, since OSes differ in terms of whether they apply routing changes to existing sockets and connections or only new ones. (This is an OS-level behavior we can't change.)
+Once you've set these options, try hitting <http://ifconfig.io/> and checking your external IP. On some OSes you may have to restart your web browser and other apps, since OSes differ in terms of whether they apply routing changes to existing sockets and connections or only new ones. (This is an OS-level behavior we can't change.)
 
 If it doesn't work, debug as you normally would with traceroute on your hosts and tcpdump on the gateway.
 
@@ -84,6 +85,7 @@ Oddly enough this is not required on the gateway/router, only participating memb
 With IPv6 you don't need NAT, which makes setup at this step a lot simpler! Our /etc/sysconfig/ip6tables looks like:
 
 /etc/sysconfig/ip6tables
+
 ```
 *filter
 :INPUT ACCEPT [0:0]

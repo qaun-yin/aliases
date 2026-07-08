@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Linode Access Token
 LINODE_ACCESS_TOKEN="your-linode-access-token"
@@ -13,11 +14,18 @@ INSTANCE_SSH_KEY="your-ssh-public-key"
 INSTANCE_VOLUMES="none"
 LINODE_API_URL="https://api.linode.com/v4/linode/instances"
 
-curl -H "Content-Type: application/json" \
+response=$(curl -s -w "%{http_code}" -H "Content-Type: application/json" \
     -H "Authorization: Bearer $LINODE_ACCESS_TOKEN" \
     -d '{"region": "'"$REGION"'","type": "'"$INSTANCE_TYPE"'","image": "'"$INSTANCE_IMAGE"'","root_pass": "'"$INSTANCE_ROOT_PASS"'","label": "'"$INSTANCE_LABEL"'","ssh_keys": ["'"$INSTANCE_SSH_KEY"'"],"authorized_users": ["root"],"backups_enabled": false,"booleans": {"private_ip": true},"volumes": ["'"$INSTANCE_VOLUMES"'"]}' \
     -X POST \
-    $LINODE_API_URL
+    $LINODE_API_URL)
+
+http_code="${response: -3}"
+if [[ "$http_code" -lt 200 || "$http_code" -gt 299 ]]; then
+    echo "Error: Failed to create Linode instance (HTTP $http_code)"
+    echo "Response: ${response%???}"
+    exit 1
+fi
 
 # Wait for Linode Instance to be provisioned
 sleep 30

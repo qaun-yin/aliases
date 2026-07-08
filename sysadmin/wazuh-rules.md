@@ -1,4 +1,4 @@
-# Wazuh Rules 
+# Wazuh Rules
 
 ```yaml
 ---

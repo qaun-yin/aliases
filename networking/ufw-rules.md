@@ -8,7 +8,7 @@ sudo ufw allow out on <interface> to any proto tcp port 80 comment 'allow HTTP o
 sudo ufw allow out on <interface> to any proto tcp port 443 comment 'allow HTTPS on <interface>'
 ```
 
-# General rules to add 
+# General rules to add
 
 ```bash
 #!/bin/bash

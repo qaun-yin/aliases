@@ -1,9 +1,26 @@
 #!/bin/bash
+set -euo pipefail
 
-### Date: Jan 14, 2023
-### Auth: cywf
-#
 # Docker Installation Script
+# Brief description of what the script does
+#
+# This script automates the installation and configuration of Docker CE on Ubuntu/Debian systems.
+# It handles the complete installation process including repository setup, package installation,
+# post-installation configuration, and service management.
+#
+# Requirements:
+# - Ubuntu/Debian-based system
+# - Internet connectivity
+# - sudo privileges
+#
+# Usage:
+# ./docker-install.sh
+#
+# Examples:
+# ./docker-install.sh
+#
+# Date: Jan 14, 2023
+# Auth: cywf
 #
 ## Setup the repository
 sudo apt-get remove docker docker-engine docker.io containerd runc
@@ -14,7 +31,7 @@ sudo apt-get install \
     gnupg \
     lsb-release
 #
-# Add Docker’s official GPG key:
+# Add Docker's official GPG key:
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 #
@@ -27,7 +44,7 @@ echo \
 sudo apt-get update
 #
 # -------------------------------------------- #
-# Recieving GPG error when running update?
+# Receiving GPG error when running update?
 # Your default umask may be incorrectly configured, 
 # preventing detection of the repository public key file. 
 # Try granting read permission for the Docker public key 
@@ -40,7 +57,7 @@ sudo apt-get update
 ## Install Docker Engine, Containerd, and Docker Compose
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 #
-## Veryify that Docker Engine is installed correctly by running the hello-world image.
+## Verify that Docker Engine is installed correctly by running the hello-world image.
 sudo docker run hello-world
 #
 # Docker Post Installation
@@ -69,7 +86,7 @@ docker run hello-world
 # due to having used the sudo command earlier.
 #
 # To fix this problem, either remove the ~/.docker/ 
-# directory (it’s recreated automatically, 
+# directory (it's recreated automatically, 
 # but any custom settings are lost), 
 # or change its ownership and permissions 
 # using the following commands:
@@ -97,5 +114,5 @@ sudo systemctl enable containerd.service
 #
 # To avoid issues with overusing disk for log data, consider one of the following options:
 #   - Configure the json-file logging driver to turn on log rotation
-#   - Use an alternative logging driver such as the “local” logging driver that performs log rotation by default
+#   - Use an alternative logging driver such as the "local" logging driver that performs log rotation by default
 #   - Use a logging driver that sends logs to a remote logging aggregator.
