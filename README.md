@@ -5,6 +5,8 @@ Feel free to fork or create a PR to contribute!
 
 ## Table of Contents
 
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
 - [Aliases](#aliases)
 - [Installation Scripts](#installation-scripts)
 - [Networking](#networking)
@@ -14,6 +16,76 @@ Feel free to fork or create a PR to contribute!
 - [TAK (Team Awareness Kit)](#tak-team-awareness-kit)
 - [StackScripts](#stackscripts)
 - [Usage](#usage)
+- [Examples](#examples)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
+
+## Overview
+
+This repository provides a comprehensive toolkit for system administrators, network engineers, and developers. It includes a collection of useful aliases, installation scripts, configuration examples, and automation tools designed to streamline common tasks and enhance productivity.
+
+The toolkit is organized into several directories, each focusing on a specific domain:
+
+- **Aliases**: Bash shortcuts for common commands
+- **Installation Scripts**: Automated setup scripts for various tools
+- **Networking**: Configuration examples and documentation
+- **System Administration**: Tools for system management
+- **Development Tools**: Resources for development environments
+- **HTB**: Penetration testing tools for Hack The Box
+- **TAK**: Team Awareness Kit setup and configuration
+- **StackScripts**: Linode automation scripts
+
+## Prerequisites
+
+Before using the tools in this repository, ensure you have:
+
+### System Requirements
+
+- **Operating System**: Linux-based system (Ubuntu/Debian recommended)
+- **Permissions**: Appropriate permissions for system administration tasks (sudo access)
+- **Disk Space**: Minimum 500MB free space for basic installations
+- **Memory**: Minimum 2GB RAM (4GB+ recommended for development environments)
+- **Processor**: Modern CPU with at least 2 cores
+
+### Network Requirements
+
+- **Internet Connectivity**: Required for downloading packages and tools
+- **Firewall Access**: Outbound HTTPS (443) and HTTP (80) access
+- **DNS Resolution**: Functional DNS for package repositories and services
+
+### Software Dependencies
+
+- **Package Manager**: APT (Ubuntu/Debian), YUM/DNF (CentOS/RHEL), or equivalent
+- **Git**: Version control system for repository management
+- **Python**: Python 3.6+ for Python-based tools
+- **Bash**: Bourne Again SHell for script execution
+- **Curl/Wget**: Command-line tools for downloading resources
+
+### Optional Dependencies
+
+- **Docker**: Container platform for containerized deployments
+- **ZeroTier/Tailscale**: VPN solutions for secure networking
+- **NGINX/Apache**: Web servers for hosting services
+- **PostgreSQL**: Database system for data storage
+- **TMUX**: Terminal multiplexer for session management
+
+### User Knowledge
+
+- **Basic Command-Line Skills**: Familiarity with Linux command-line operations
+- **System Administration Concepts**: Understanding of networking, security, and system management
+- **Security Best Practices**: Knowledge of secure system configuration
+- **Troubleshooting Skills**: Ability to diagnose and resolve common system issues
+
+### Hardware Considerations
+
+- **Development Workloads**: 4GB+ RAM and 2+ CPU cores recommended
+- **Server Deployments**: 8GB+ RAM and 4+ CPU cores recommended
+- **Storage**: SSD storage recommended for better performance
+- **Network Interface**: Gigabit Ethernet recommended for server applications
+
+Individual scripts may have additional requirements which are documented in their respective directories.
 
 ## Aliases
 
@@ -163,26 +235,262 @@ The `stackscripts/` directory contains Linode StackScripts for automated server 
 ### Web Server
 - **provision.sh** - Web server provisioning script
 
-## Quick Start
+## Usage Examples
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/cywf/aliases.git
-   cd aliases
-   ```
+### Basic System Setup
 
-2. **Install aliases:**
-   ```bash
-   cp bash_aliases ~/.bash_aliases
-   source ~/.bashrc
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/cywf/aliases.git
+cd aliases
 
-3. **Run installation scripts as needed:**
-   ```bash
-   cd install-scripts
-   chmod +x docker-install.sh
-   ./docker-install.sh
-   ```
+# Install useful bash aliases
+cp bash_aliases ~/.bash_aliases
+source ~/.bashrc
+
+# Update system packages
+update
+
+# Install Docker
+cd install-scripts
+chmod +x docker-install.sh
+./docker-install.sh
+```
+
+### Network Configuration
+
+```bash
+# Configure UFW firewall
+ufw enable
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw status verbose
+
+# Install and configure ZeroTier
+chmod +x zerotier-install.sh
+./zerotier-install.sh
+sudo zerotier-cli join NETWORK_ID
+
+# Set up advanced NGINX configuration
+sudo cp networking/example-advanced.nginx.conf /etc/nginx/sites-available/advanced
+cd /etc/nginx/sites-enabled
+sudo ln -s ../sites-available/advanced .
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Development Environment Setup
+
+```bash
+# Set up complete development environment
+cd install-scripts
+chmod +x setup_dev_enviornment.sh
+./setup_dev_enviornment.sh
+
+# Install Git and configure SSH keys
+chmod +x git_setup.sh
+./git_setup.sh "Your Name" "your.email@example.com"
+
+# Install TMUX with enhanced configuration
+cd ..
+chmod +x tmux-install.sh
+./tmux-install.sh
+```
+
+### Security Tools Installation
+
+```bash
+# Install Wazuh security platform
+cd install-scripts
+chmod +x wazuh_wizard.sh
+./wazuh_wizard.sh
+
+# Disable unnecessary services for security
+sudo sysadmin/disable-services.md
+
+# Install Wireshark for network analysis
+chmod +x wireshark-install.sh
+./wireshark-install.sh
+```
+
+### Container Management
+
+```bash
+# Install Docker and Docker Compose
+cd install-scripts
+chmod +x docker-install.sh
+./docker-install.sh
+
+# Install LazyDocker for container management
+chmod +x lazydocker-install.sh
+./lazydocker-install.sh
+
+# Use container management tools
+python3 sysadmin/c-mgmt.py
+```
+
+### Penetration Testing Setup
+
+```bash
+# Set up HTB tools for penetration testing
+cd htb
+python3 main.py
+
+# Follow the prompts to configure for a specific machine
+# Enter machine handle, name, IP, and type
+# The tool will automatically:
+# - Create directory structure
+# - Install necessary tools
+# - Perform Nmap scans
+# - Generate payloads
+```
+
+### TAK Environment Setup
+
+```bash
+# Set up TAK environment with monitoring
+cd tak
+chmod +x setup_tak.sh
+./setup_tak.sh
+
+# The script will:
+# - Check for dependencies
+# - Install missing tools
+# - Start Docker service
+# - Launch tmux session with monitoring tools
+
+# For advanced TAK configuration
+python3 tak_setup.py
+# Follow the interactive wizard for detailed setup
+```
+
+### Cloud Infrastructure Setup
+
+```bash
+# Set up development server on AWS with Terraform
+cd dev/terraform
+# Follow the instructions in dev-server.md
+# Configure AWS CLI
+aws configure
+# Initialize Terraform
+terraform init
+# Apply configuration
+terraform apply
+```
+
+### Automation and Scripting
+
+```bash
+# Use bash aliases for common tasks
+update          # sudo apt-get update
+upgrade         # sudo apt-get upgrade
+gs              # git status
+ga .            # git add .
+gcm "Commit message"  # git commit -m "Commit message"
+gp              # git push
+ufws            # sudo ufw status
+dps             # docker ps -a
+```
+
+### Server Provisioning
+
+```bash
+# Use Linode StackScripts for server provisioning
+# Create a new Linode
+# Select the appropriate StackScript
+# Provide required parameters
+# Deploy the Linode
+
+# For web server deployment
+cd stackscripts/webserver
+# Review provision.sh
+# Create StackScript in Linode dashboard
+# Deploy with custom configuration
+```
+
+### Troubleshooting and Maintenance
+
+```bash
+# Check system status
+sysinfo
+
+# Check service status
+sysctls docker
+
+# Restart services
+sysctlr nginx
+
+# Clean up system
+clean
+
+# Check firewall status
+ufws
+
+# View system logs
+journalctl -f
+```
+
+These examples demonstrate common usage patterns for the tools in this repository. Always review scripts before execution and ensure you understand the changes they will make to your system.
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Update system packages
+update
+
+# Check system status
+sys-status
+
+# View network configuration
+net-info
+```
+
+### Docker Installation
+
+```bash
+# Install Docker
+./install-scripts/docker-install.sh
+
+# Verify installation
+docker --version
+```
+
+### Firewall Configuration
+
+```bash
+# Configure UFW rules
+./networking/ufw-setup.sh
+
+# Check firewall status
+sudo ufw status
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Permission Denied Errors**
+   - Ensure you have appropriate permissions
+   - Run scripts with `sudo` if required
+
+2. **Package Installation Failures**
+   - Check internet connectivity
+   - Update package lists with `sudo apt update`
+
+3. **Script Execution Issues**
+   - Verify script permissions with `chmod +x`
+   - Check script syntax with `bash -n`
+
+### Getting Help
+
+If you encounter issues not covered in this documentation:
+
+1. Check the specific directory README for detailed troubleshooting
+2. Open an issue on GitHub with detailed information
+3. Include error messages and system information
 
 ## Contributing
 
