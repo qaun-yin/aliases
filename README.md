@@ -126,7 +126,7 @@ Located in `install-scripts/`, these scripts automate the installation and confi
 
 ### Development Tools
 - **git_setup.sh** - Configure Git with user details
-- **setup_dev_enviornment.sh** - Set up a complete development environment
+- **setup_dev_environment.sh** - Set up a complete development environment
 - **tmux-install.sh** - Install and configure TMUX
 
 ### Web & Security
@@ -285,8 +285,8 @@ sudo systemctl reload nginx
 ```bash
 # Set up complete development environment
 cd install-scripts
-chmod +x setup_dev_enviornment.sh
-./setup_dev_enviornment.sh
+chmod +x setup_dev_environment.sh
+./setup_dev_environment.sh
 
 # Install Git and configure SSH keys
 chmod +x git_setup.sh

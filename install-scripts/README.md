@@ -174,7 +174,7 @@ chmod +x git_setup.sh
 ./git_setup.sh "Your Name" "your.email@example.com"
 ```
 
-### setup_dev_enviornment.sh
+### setup_dev_environment.sh
 
 Sets up a complete development environment.
 
@@ -187,8 +187,8 @@ Sets up a complete development environment.
 **Usage:**
 
 ```bash
-chmod +x setup_dev_enviornment.sh
-./setup_dev_enviornment.sh
+chmod +x setup_dev_environment.sh
+./setup_dev_environment.sh
 ```
 
 ### tmux-install.sh
