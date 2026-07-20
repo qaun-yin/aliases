@@ -348,6 +348,25 @@ chmod +x whisper.sh
 ./whisper.sh
 ```
 
+### hermes-portable-usb.sh
+
+Locates a mounted Local-Hermes-Portable USB drive, verifies the portable Hermes launcher, prints the `SENTINEL ONLINE` / `Welcome Back Sir` terminal banner, optionally sends a Telegram health report, and starts portable Hermes.
+
+**Requirements:**
+
+- Linux or macOS
+- Mounted Local-Hermes-Portable USB drive
+- `curl` only if Telegram notification is desired
+- Telegram bot token/chat ID via environment variables or `.telegram.env` on the USB
+
+**Usage:**
+
+```bash
+chmod +x hermes-portable-usb.sh
+./hermes-portable-usb.sh --verify-only
+./hermes-portable-usb.sh
+```
+
 ## Radio & SDR
 
 ### rtl-sdr.sh

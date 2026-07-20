@@ -93,4 +93,35 @@ alias zerotier-cli="sudo zerotier-cli"
 
 ## AI Stuff
 
+# Portable Hermes USB launcher. Plug in the Samsung BAR Plus drive, then run:
+#   hermesusb
+# Optional: export ALIASES_REPO=/path/to/aliases if this repo lives somewhere custom.
+hermes-portable-usb() {
+  local script=""
+  local candidates=(
+    "$HOME/aliases/install-scripts/hermes-portable-usb.sh"
+    "$HOME/code/aliases/install-scripts/hermes-portable-usb.sh"
+    "$HOME/.aliases/install-scripts/hermes-portable-usb.sh"
+  )
+  if [ -n "${ALIASES_REPO:-}" ]; then
+    candidates=("$ALIASES_REPO/install-scripts/hermes-portable-usb.sh" "${candidates[@]}")
+  fi
+
+  for candidate in "${candidates[@]}"; do
+    if [ -x "$candidate" ]; then
+      script="$candidate"
+      break
+    fi
+  done
+
+  if [ -z "$script" ]; then
+    echo "hermes-portable-usb.sh not found. Set ALIASES_REPO to your aliases repo path." >&2
+    return 1
+  fi
+
+  "$script" "$@"
+}
+alias hermesusb="hermes-portable-usb"
+alias sentinel="hermes-portable-usb"
+
 # alias automode=""  # TODO: Add automode command
