@@ -36,6 +36,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("TAK-Setup")
 
+CONFIG_FILE = os.path.expanduser("~/.tak_setup_config.json")
+
 # ANSI color codes for terminal output
 class Colors:
     HEADER = '\033[95m'
@@ -104,6 +106,23 @@ def get_linux_distro() -> str:
                 if line.startswith("ID="):
                     return line.split("=")[1].strip().strip('"')
     return "unknown"
+
+def docker_compose_command() -> Optional[List[str]]:
+    """Return the available Docker Compose command, preferring the v2 plugin."""
+    if shutil.which("docker") is not None:
+        result = subprocess.run(
+            ["docker", "compose", "version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode == 0:
+            return ["docker", "compose"]
+
+    if shutil.which("docker-compose") is not None:
+        return ["docker-compose"]
+
+    return None
 
 def print_banner():
     """Print a welcome banner for the script."""
@@ -253,8 +272,9 @@ def setup_zerotier():
         try:
             # Install ZeroTier One
             subprocess.run(
-                ["curl", "-s", "https://install.zerotier.com", "|", "sudo", "bash"],
-                check=True, shell=True
+                "curl -s https://install.zerotier.com | sudo bash",
+                check=True,
+                shell=True,
             )
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to install ZeroTier: {e}")
@@ -287,8 +307,9 @@ def setup_tailscale():
         try:
             # Install Tailscale (for Debian/Ubuntu)
             subprocess.run(
-                ["curl", "-fsSL", "https://tailscale.com/install.sh", "|", "sudo", "bash"],
-                check=True, shell=True
+                "curl -fsSL https://tailscale.com/install.sh | sudo bash",
+                check=True,
+                shell=True,
             )
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to install Tailscale: {e}")
@@ -343,10 +364,16 @@ def deploy_tak_docker():
     else:  # client
         create_client_docker_compose(compose_file)
     
+    compose_cmd = docker_compose_command()
+    if compose_cmd is None:
+        logger.error("Docker Compose is not installed")
+        print(f"{Colors.RED}Docker Compose is required. Install the Docker Compose plugin or docker-compose.{Colors.END}")
+        return False
+
     # Start the containers
     try:
         subprocess.run(
-            ["docker-compose", "-f", compose_file, "up", "-d"],
+            compose_cmd + ["-f", compose_file, "up", "-d"],
             check=True
         )
         print(f"{Colors.GREEN}Successfully started TAK Docker containers!{Colors.END}")
@@ -411,26 +438,22 @@ services:
 
 def save_config():
     """Save the configuration to a file."""
-    config_file = os.path.join(config["data_path"], "tak_setup_config.json")
-    
-    with open(config_file, "w") as f:
+    with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
     
-    print(f"{Colors.GREEN}Configuration saved to {config_file}{Colors.END}")
+    print(f"{Colors.GREEN}Configuration saved to {CONFIG_FILE}{Colors.END}")
 
 def load_config() -> bool:
     """Load configuration from a file if it exists."""
-    config_file = os.path.expanduser("~/tak_setup_config.json")
-    
-    if os.path.exists(config_file):
+    if os.path.exists(CONFIG_FILE):
         try:
-            with open(config_file, "r") as f:
+            with open(CONFIG_FILE, "r") as f:
                 loaded_config = json.load(f)
                 
                 for key, value in loaded_config.items():
                     config[key] = value
                 
-                print(f"{Colors.GREEN}Loaded configuration from {config_file}{Colors.END}")
+                print(f"{Colors.GREEN}Loaded configuration from {CONFIG_FILE}{Colors.END}")
                 return True
                 
         except (json.JSONDecodeError, IOError) as e:
