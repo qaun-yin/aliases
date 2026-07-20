@@ -1,7 +1,30 @@
 #!/bin/bash
 # setup_tak.sh
-# Example script that sets up dependencies, then splits tmux into 4 panes.
-
+# Brief description of what the script does
+#
+# This script automates the setup of a Team Awareness Kit (TAK) environment.
+# It checks for and installs necessary dependencies (tmux, Docker),
+# starts the Docker service if needed, and launches a pre-configured tmux session
+# with monitoring tools in a 2x2 grid layout.
+#
+# Requirements:
+# - Ubuntu/Debian-based system
+# - Internet connectivity
+# - sudo privileges
+#
+# Usage:
+# ./setup_tak.sh
+#
+# Examples:
+# ./setup_tak.sh
+#
+# Features:
+# - Automatic dependency checking and installation
+# - Docker service management
+# - Pre-configured tmux session with monitoring tools
+# - Visual feedback with colored output and spinner animations
+# - 2x2 grid layout for efficient multitasking
+#
 # ANSI color codes
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'

@@ -1,0 +1,177 @@
+# Documentation Index
+
+This index provides links to all documentation files in the repository, organized by directory structure.
+
+## Table of Contents
+
+- [Main Documentation](#main-documentation)
+- [Installation Scripts](#installation-scripts)
+- [System Administration](#system-administration)
+- [Networking](#networking)
+- [Development Tools](#development-tools)
+- [Hack The Box (HTB)](#hack-the-box-htb)
+- [Team Awareness Kit (TAK)](#team-awareness-kit-tak)
+- [StackScripts](#stackscripts)
+- [Bash Aliases](#bash-aliases)
+
+## Main Documentation
+
+- [README.md](README.md) - Main repository documentation
+- [LICENSE](LICENSE) - License information
+
+## Installation Scripts
+
+### Main Documentation
+
+- [install-scripts/README.md](install-scripts/README.md) - Installation scripts overview
+
+### Individual Script Documentation
+
+- [install-scripts/docs/docker-install.md](install-scripts/docs/docker-install.md) - Docker installation script
+- [install-scripts/docs/nginx_setup.md](install-scripts/docs/nginx_setup.md) - NGINX setup script
+- [install-scripts/docs/git_setup.md](install-scripts/docs/git_setup.md) - Git setup script
+- [install-scripts/docs/zerotier-install.md](install-scripts/docs/zerotier-install.md) - ZeroTier installation script
+- [install-scripts/docs/tmux-install.md](install-scripts/docs/tmux-install.md) - TMUX installation script
+
+### Scripts
+
+- [install-scripts/docker-install.sh](install-scripts/docker-install.sh) - Docker installation script
+- [install-scripts/nginx_setup.sh](install-scripts/nginx_setup.sh) - NGINX setup script
+- [install-scripts/git_setup.sh](install-scripts/git_setup.sh) - Git setup script
+- [install-scripts/zerotier-install.sh](install-scripts/zerotier-install.sh) - ZeroTier installation script
+- [install-scripts/tmux-install.sh](install-scripts/tmux-install.sh) - TMUX installation script
+- [install-scripts/autogpt-install.sh](install-scripts/autogpt-install.sh) - AutoGPT installation script
+- [install-scripts/brave-browser.sh](install-scripts/brave-browser.sh) - Brave browser installation script
+- [install-scripts/docker-deb-install.sh](install-scripts/docker-deb-install.sh) - Docker DEB installation script
+- [install-scripts/helm-install.sh](install-scripts/helm-install.sh) - Helm installation script
+- [install-scripts/lazydocker-install.sh](install-scripts/lazydocker-install.sh) - LazyDocker installation script
+- [install-scripts/minecraft-install.sh](install-scripts/minecraft-install.sh) - Minecraft installation script
+- [install-scripts/rancher-install.sh](install-scripts/rancher-install.sh) - Rancher installation script
+- [install-scripts/rtl-sdr.sh](install-scripts/rtl-sdr.sh) - RTL-SDR setup script
+- [install-scripts/setup_dev_enviornment.sh](install-scripts/setup_dev_enviornment.sh) - Development environment setup script
+- [install-scripts/tailscale_manager.sh](install-scripts/tailscale_manager.sh) - Tailscale manager script
+- [install-scripts/teleport-install.sh](install-scripts/teleport-install.sh) - Teleport installation script
+- [install-scripts/usb-key-setup.sh](install-scripts/usb-key-setup.sh) - USB key setup script
+- [install-scripts/wazuh_wizard.sh](install-scripts/wazuh_wizard.sh) - Wazuh setup wizard script
+- [install-scripts/whisper.sh](install-scripts/whisper.sh) - Whisper installation script
+- [install-scripts/wireshark-install.sh](install-scripts/wireshark-install.sh) - Wireshark installation script
+- [install-scripts/zerotier-conf.sh](install-scripts/zerotier-conf.sh) - ZeroTier configuration script
+
+## System Administration
+
+### Main Documentation
+
+- [sysadmin/README.md](sysadmin/README.md) - System administration tools overview
+
+### Tool Documentation
+
+- [sysadmin/docs/c-mgmt.md](sysadmin/docs/c-mgmt.md) - Container management script
+- [sysadmin/docs/usb-helper.md](sysadmin/docs/usb-helper.md) - USB helper script
+- [sysadmin/docs/linux-system-setup.md](sysadmin/docs/linux-system-setup.md) - Linux system setup script
+
+### Guides
+
+- [sysadmin/disable-services.md](sysadmin/disable-services.md) - Service disabling guide
+- [sysadmin/wazuh-rules.md](sysadmin/wazuh-rules.md) - Wazuh rules documentation
+
+### Scripts
+
+- [sysadmin/c-mgmt.py](sysadmin/c-mgmt.py) - Container management script
+- [sysadmin/usb-helper.sh](sysadmin/usb-helper.sh) - USB helper script
+- [sysadmin/linux-system-setup.sh](sysadmin/linux-system-setup.sh) - Linux system setup script
+
+## Networking
+
+### Main Documentation
+
+- [networking/README.md](networking/README.md) - Networking configuration overview
+
+### Configuration Documentation
+
+- [networking/docs/example-advanced.nginx.md](networking/docs/example-advanced.nginx.md) - Advanced NGINX configuration
+- [networking/docs/ufw-rules.md](networking/docs/ufw-rules.md) - UFW firewall rules
+- [networking/docs/zerotier-default-ethernet.md](networking/docs/zerotier-default-ethernet.md) - ZeroTier Ethernet bridge configuration
+
+### Configuration Files
+
+- [networking/example-advanced.nginx.conf](networking/example-advanced.nginx.conf) - Advanced NGINX configuration file
+- [networking/ufw-rules.md](networking/ufw-rules.md) - UFW firewall rules
+- [networking/zerotier-default-ethernet.md](networking/zerotier-default-ethernet.md) - ZeroTier Ethernet bridge configuration
+
+## Development Tools
+
+### Main Documentation
+
+- [dev/README.md](dev/README.md) - Development tools overview
+
+### Terraform Configurations
+
+- [dev/terraform/dev-server.md](dev/terraform/dev-server.md) - Development server Terraform configuration
+
+## Hack The Box (HTB)
+
+### Main Documentation
+
+- [htb/README.md](htb/README.md) - HTB tools overview
+
+### Tool Documentation
+
+- [htb/docs/error_handling.md](htb/docs/error_handling.md) - Error handling module
+- [htb/docs/setup.md](htb/docs/setup.md) - Setup module
+- [htb/docs/tools.md](htb/docs/tools.md) - Tools module
+- [htb/docs/nmap_payload_gen.md](htb/docs/nmap_payload_gen.md) - Nmap and payload generation module
+
+### Scripts
+
+- [htb/error_handling.py](htb/error_handling.py) - Error handling module
+- [htb/main.py](htb/main.py) - Main orchestration script
+- [htb/nmap_payload_gen.py](htb/nmap_payload_gen.py) - Nmap and payload generation module
+- [htb/setup.py](htb/setup.py) - Setup module
+- [htb/tools.py](htb/tools.py) - Tools module
+
+## Team Awareness Kit (TAK)
+
+### Main Documentation
+
+- [tak/README.md](tak/README.md) - TAK setup overview
+
+### Setup Scripts
+
+- [tak/setup_tak.sh](tak/setup_tak.sh) - TAK environment setup script
+- [tak/tak_setup.py](tak/tak_setup.py) - Advanced TAK setup script
+
+### Configuration Documentation
+
+- [tak/docs/docker.md](tak/docs/docker.md) - Docker configuration for TAK
+- [tak/docs/tailscale.md](tak/docs/tailscale.md) - Tailscale integration
+- [tak/docs/tak-client.md](tak/docs/tak-client.md) - TAK client setup
+- [tak/docs/tak-server.md](tak/docs/tak-server.md) - TAK server setup
+- [tak/docs/zerotier.md](tak/docs/zerotier.md) - ZeroTier integration
+- [tak/docs/tak_setup.md](tak/docs/tak_setup.md) - Advanced TAK setup script documentation
+
+### Guides
+
+- [tak/docker.md](tak/docker.md) - Docker configuration for TAK
+- [tak/tailscale.md](tak/tailscale.md) - Tailscale integration
+- [tak/tak-client.md](tak/tak-client.md) - TAK client setup
+- [tak/tak-server.md](tak/tak-server.md) - TAK server setup
+- [tak/zerotier.md](tak/zerotier.md) - ZeroTier integration
+
+## StackScripts
+
+### Main Documentation
+
+- [stackscripts/README.md](stackscripts/README.md) - StackScripts overview
+
+### StackScript Documentation
+
+- [stackscripts/dev-server/README.md](stackscripts/dev-server/README.md) - Development server StackScript
+- [stackscripts/webserver/README.md](stackscripts/webserver/README.md) - Web server StackScript
+
+### StackScript Files
+
+- [stackscripts/webserver/provision.sh](stackscripts/webserver/provision.sh) - Web server provisioning script
+
+## Bash Aliases
+
+- [bash_aliases](bash_aliases) - Bash command shortcuts
