@@ -34,11 +34,39 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Function to prompt for domain details
+is_valid_ipv4() {
+    local ip=$1 octet
+    [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+    IFS='.' read -r -a octets <<<"$ip"
+    for octet in "${octets[@]}"; do
+        ((octet >= 0 && octet <= 255)) || return 1
+    done
+}
+
+restart_service() {
+    local service=$1
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl restart "$service"
+    elif command -v service >/dev/null 2>&1; then
+        service "$service" restart
+    elif [ -x "/etc/init.d/$service" ]; then
+        "/etc/init.d/$service" restart
+    else
+        echo "ERROR: Could not restart $service; no supported service manager found."
+        return 1
+    fi
+}
+
 prompt_for_details() {
     echo "Let's set up NGINX for your server."
     read -p "Enter your main domain (e.g., example.com): " MAIN_DOMAIN
     read -p "Enter your sandbox domain (e.g., sandbox.example.com): " SANDBOX_DOMAIN
-    read -p "Enter your ZeroTier IP (e.g., 10.6.4.2): " ZEROTIER_IP
+    read -p "Enter your ZeroTier IP (e.g., 10.6.4.2, leave blank for all interfaces): " ZEROTIER_IP
+
+    if [ -n "$ZEROTIER_IP" ] && ! is_valid_ipv4 "$ZEROTIER_IP"; then
+        echo "ERROR: Invalid ZeroTier IP: $ZEROTIER_IP"
+        exit 1
+    fi
 
     echo "Configuring NGINX with the following details:"
     echo "Main Domain: $MAIN_DOMAIN"
@@ -63,13 +91,18 @@ install_nginx() {
 configure_nginx() {
     echo "Creating NGINX configuration files..."
     NGINX_CONF="/etc/nginx/sites-available/$MAIN_DOMAIN"
+    if [ -n "$ZEROTIER_IP" ]; then
+        LISTEN_DIRECTIVE="listen $ZEROTIER_IP:443 ssl http2;"
+    else
+        LISTEN_DIRECTIVE="listen 443 ssl http2;"
+    fi
     cat >"$NGINX_CONF" <<EOF
 server {
-    listen $ZEROTIER_IP:443 ssl http2;
+    $LISTEN_DIRECTIVE
     server_name $MAIN_DOMAIN $SANDBOX_DOMAIN;
 
-    ssl_certificate /etc/ssl/lets-encrypt/$MAIN_DOMAIN/cert.pem;
-    ssl_certificate_key /etc/ssl/lets-encrypt/$MAIN_DOMAIN/key.pem;
+    ssl_certificate /etc/letsencrypt/live/$MAIN_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$MAIN_DOMAIN/privkey.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
@@ -96,7 +129,7 @@ server {
 EOF
 
     # Create symbolic link and test configuration
-    ln -s "$NGINX_CONF" /etc/nginx/sites-enabled/
+    ln -sfn "$NGINX_CONF" "/etc/nginx/sites-enabled/$MAIN_DOMAIN"
     nginx -t
     if [ $? -ne 0 ]; then
         echo "NGINX configuration test failed. Please check your configuration."
@@ -104,7 +137,7 @@ EOF
     fi
 
     # Restart NGINX
-    systemctl restart nginx
+    restart_service nginx
     echo "NGINX configured and restarted successfully."
 }
 
@@ -132,9 +165,16 @@ install_optional_tools() {
         ;;
     3)
         echo "Installing ZeroTier..."
-        curl -s https://install.zerotier.com | bash
-        systemctl enable zerotier-one
-        systemctl start zerotier-one
+        ZEROTIER_INSTALLER=$(mktemp)
+        curl -fsSL https://install.zerotier.com -o "$ZEROTIER_INSTALLER"
+        bash "$ZEROTIER_INSTALLER"
+        rm -f "$ZEROTIER_INSTALLER"
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl enable zerotier-one
+            systemctl start zerotier-one
+        else
+            restart_service zerotier-one
+        fi
         echo "ZeroTier installed. Use 'zerotier-cli join <networkID>' to join a network."
         ;;
     4)
