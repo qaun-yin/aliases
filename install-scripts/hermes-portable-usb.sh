@@ -414,7 +414,8 @@ ensure_executable_bits() {
 }
 
 load_telegram_env() {
-  local root="$1" env_file line key value
+  local root="$1" env_file line key value usb_root
+  # Check inside the portable root first
   for env_file in "$root/.telegram.env" "$root/telegram.env" "$root/hermes/.env"; do
     [ -f "$env_file" ] || continue
     while IFS= read -r line || [ -n "$line" ]; do
@@ -433,6 +434,29 @@ load_telegram_env() {
       esac
     done < "$env_file"
   done
+
+  # Also check the USB mount root (parent of portable root) for env files
+  usb_root="$(dirname "$root" 2>/dev/null)"
+  if [ -n "$usb_root" ] && [ "$usb_root" != "/" ] && [ "$usb_root" != "." ]; then
+    for env_file in "$usb_root/.telegram.env" "$usb_root/telegram.env"; do
+      [ -f "$env_file" ] || continue
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in ''|'#'*) continue ;; esac
+        key="${line%%=*}"
+        value="${line#*=}"
+        value="${value%\"}"; value="${value#\"}"
+        value="${value%\'}"; value="${value#\'}"
+        case "$key" in
+          HERMES_USB_TELEGRAM_BOT_TOKEN|TELEGRAM_BOT_TOKEN|TELEGRAM_TOKEN)
+            TELEGRAM_TOKEN="${TELEGRAM_TOKEN:-$value}"
+            ;;
+          HERMES_USB_TELEGRAM_CHAT_ID|TELEGRAM_CHAT_ID)
+            TELEGRAM_CHAT="${TELEGRAM_CHAT:-$value}"
+            ;;
+        esac
+      done < "$env_file"
+    done
+  fi
 }
 
 health_report() {
