@@ -31,7 +31,7 @@ fi
 sleep 30
 
 # SSH into the instance
-ssh root@<INSTANCE_IP>
+ssh "root@${INSTANCE_IP:?Set INSTANCE_IP before running this script}"
 
 # Update the system and install necessary dependencies
 apt update

