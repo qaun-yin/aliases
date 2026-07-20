@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-VERSION="3.1.0"
+VERSION="3.2.0"
 PORTABLE_REPO_URL="${HERMES_PORTABLE_REPO_URL:-https://github.com/techjarves/Local-Hermes-Portable.git}"
 PORTABLE_ARCHIVE_URL="${HERMES_PORTABLE_ARCHIVE_URL:-https://github.com/techjarves/Local-Hermes-Portable/archive/refs/heads/main.tar.gz}"
 PORTABLE_DIR_NAME="${HERMES_PORTABLE_DIR_NAME:-Local-Hermes-Portable}"
@@ -160,6 +160,62 @@ removable_mounts() {
   done <<< "$devs" | sort -u
 }
 
+# Auto-mount an unmounted removable USB drive.
+# Returns the mountpoint on success, non-zero on failure.
+mount_removable_drive() {
+  local dev devs part part_name mountpoint label
+
+  # Find removable block devices that have no mounted partitions.
+  devs="$(removable_block_devices)" || return 1
+  [ -n "$devs" ] || return 1
+
+  while IFS= read -r dev; do
+    # Check if any partition of this device is already mounted
+    if grep -qs "/dev/$dev" /proc/mounts 2>/dev/null; then
+      continue
+    fi
+
+    # Find the first unmounted partition
+    for part in /sys/block/"$dev"/"$dev"*; do
+      [ -d "$part" ] || continue
+      # Skip the parent device entry itself
+      [ "$(basename "$part")" = "$dev" ] && continue
+
+      # Check if this specific partition is mounted
+      part_name="$(basename "$part")"
+      if grep -qs "/dev/$part_name" /proc/mounts 2>/dev/null; then
+        continue
+      fi
+
+      # Try udisksctl first (modern Linux desktops/servers)
+      if command -v udisksctl >/dev/null 2>&1; then
+        mountpoint="$(udisksctl mount -b "/dev/$part_name" 2>/dev/null | sed -n 's/^.*at \(.*\)$/\1/p')"
+        if [ -n "$mountpoint" ] && [ -d "$mountpoint" ]; then
+          printf '%s\n' "$mountpoint"
+          return 0
+        fi
+      fi
+
+      # Fallback: try mount to a standard location
+      label=""
+      if command -v blkid >/dev/null 2>&1; then
+        label="$(blkid -s LABEL -o value "/dev/$part_name" 2>/dev/null || echo "usb-$part_name")"
+      else
+        label="usb-$part_name"
+      fi
+      mountpoint="/media/${USER:-root}/$label"
+      mkdir -p "$mountpoint" 2>/dev/null || continue
+      if mount "/dev/$part_name" "$mountpoint" 2>/dev/null; then
+        printf '%s\n' "$mountpoint"
+        return 0
+      fi
+      rmdir "$mountpoint" 2>/dev/null || true
+    done
+  done <<< "$devs"
+
+  return 1
+}
+
 diskutil_usb_mounts() {
   command -v diskutil >/dev/null 2>&1 || return 1
   diskutil list -plist external 2>/dev/null | \
@@ -208,6 +264,8 @@ usb_mount_roots() {
   removable_mounts || true
   diskutil_usb_mounts || true
   wsl2_mount_roots || true
+  # Last resort: try to auto-mount an unmounted removable drive.
+  mount_removable_drive || true
 
   [ -n "${USER:-}" ] && {
     printf '/media/%s/Samsung USB\n' "$USER"
