@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-VERSION="3.2.1"
+VERSION="3.3.0"
 PORTABLE_REPO_URL="${HERMES_PORTABLE_REPO_URL:-https://github.com/techjarves/Local-Hermes-Portable.git}"
 PORTABLE_ARCHIVE_URL="${HERMES_PORTABLE_ARCHIVE_URL:-https://github.com/techjarves/Local-Hermes-Portable/archive/refs/heads/main.tar.gz}"
 PORTABLE_DIR_NAME="${HERMES_PORTABLE_DIR_NAME:-Local-Hermes-Portable}"
@@ -160,34 +160,59 @@ removable_mounts() {
   done <<< "$devs" | sort -u
 }
 
-# Auto-mount an unmounted removable USB drive.
+# Auto-mount an unmounted removable USB drive, or remount one that's
+# mounted under an inaccessible path (e.g. another user's /media/ dir).
 # Returns the mountpoint on success, non-zero on failure.
 mount_removable_drive() {
-  local dev devs part part_name mountpoint label
+  local dev devs part part_name mountpoint label existing_mount
 
-  # Find removable block devices that have no mounted partitions.
+  # Find removable block devices.
   devs="$(removable_block_devices)" || return 1
   [ -n "$devs" ] || return 1
 
   while IFS= read -r dev; do
-    # Check if any partition of this device is already mounted
-    if grep -qs "/dev/$dev" /proc/mounts 2>/dev/null; then
-      continue
-    fi
-
-    # Find the first unmounted partition
     for part in /sys/block/"$dev"/"$dev"*; do
       [ -d "$part" ] || continue
-      # Skip the parent device entry itself
       [ "$(basename "$part")" = "$dev" ] && continue
 
-      # Check if this specific partition is mounted
       part_name="$(basename "$part")"
-      if grep -qs "/dev/$part_name" /proc/mounts 2>/dev/null; then
+
+      # Check if this partition is already mounted
+      existing_mount="$(awk -v dev="/dev/$part_name" '$1 == dev {print $2}' /proc/mounts 2>/dev/null | head -1)"
+
+      if [ -n "$existing_mount" ]; then
+        # Already mounted — check if the current user can access it
+        if [ -r "$existing_mount" ] && [ -x "$existing_mount" ]; then
+          # Accessible — return it as-is
+          printf '%s\n' "$existing_mount"
+          return 0
+        fi
+        # Mounted but inaccessible (different user) — try to remount
+        # to a user-accessible path. First try bind mount.
+        label=""
+        if command -v blkid >/dev/null 2>&1; then
+          label="$(blkid -s LABEL -o value "/dev/$part_name" 2>/dev/null || echo "usb-$part_name")"
+        else
+          label="usb-$part_name"
+        fi
+        mountpoint="/media/${USER:-root}/$label"
+        if [ ! -d "$mountpoint" ]; then
+          mkdir -p "$mountpoint" 2>/dev/null || continue
+        fi
+        if mount --bind "$existing_mount" "$mountpoint" 2>/dev/null; then
+          printf '%s\n' "$mountpoint"
+          return 0
+        fi
+        # Bind mount failed — try a fresh mount (may require sudo)
+        if mount "/dev/$part_name" "$mountpoint" 2>/dev/null; then
+          printf '%s\n' "$mountpoint"
+          return 0
+        fi
+        # Nothing worked — skip this partition
         continue
       fi
 
-      # Try udisksctl first (modern Linux desktops/servers)
+      # Not mounted — try udisksctl first
       if command -v udisksctl >/dev/null 2>&1; then
         mountpoint="$(udisksctl mount -b "/dev/$part_name" 2>/dev/null | sed -n 's/^.*at \(.*\)$/\1/p')"
         if [ -n "$mountpoint" ] && [ -d "$mountpoint" ]; then
@@ -196,7 +221,7 @@ mount_removable_drive() {
         fi
       fi
 
-      # Fallback: try mount to a standard location
+      # Fallback: mount to a standard location
       label=""
       if command -v blkid >/dev/null 2>&1; then
         label="$(blkid -s LABEL -o value "/dev/$part_name" 2>/dev/null || echo "usb-$part_name")"
