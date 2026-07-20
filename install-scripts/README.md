@@ -350,12 +350,13 @@ chmod +x whisper.sh
 
 ### hermes-portable-usb.sh
 
-Locates a mounted Local-Hermes-Portable USB drive, verifies the portable Hermes launcher, prints the `SENTINEL ONLINE` / `Welcome Back Sir` terminal banner, optionally sends a Telegram health report, and starts portable Hermes.
+Locates a mounted Local-Hermes-Portable USB drive, verifies the portable Hermes launcher, prints the `SENTINEL ONLINE` / `Welcome Back Sir` terminal banner, optionally sends a Telegram health report, and starts portable Hermes. If the USB is mounted but `Local-Hermes-Portable` is not present, the script can bootstrap it from `https://github.com/techjarves/Local-Hermes-Portable`.
 
 **Requirements:**
 
 - Linux or macOS
-- Mounted Local-Hermes-Portable USB drive
+- Mounted USB drive, ideally the preloaded Samsung BAR Plus drive
+- `git`, or `curl` + `tar`, only if bootstrapping `Local-Hermes-Portable` onto the USB is needed
 - `curl` only if Telegram notification is desired
 - Telegram bot token/chat ID via environment variables or `.telegram.env` on the USB
 
@@ -365,6 +366,23 @@ Locates a mounted Local-Hermes-Portable USB drive, verifies the portable Hermes 
 chmod +x hermes-portable-usb.sh
 ./hermes-portable-usb.sh --verify-only
 ./hermes-portable-usb.sh
+./hermes-portable-usb.sh --launcher   # run linux.sh/mac.sh instead of hermes/launch.sh
+```
+
+After sourcing `bash_aliases`, the expected shortcuts are:
+
+```bash
+sentinel
+hermes-usb
+hermesusb   # legacy compatibility
+```
+
+Useful overrides:
+
+```bash
+HERMES_PORTABLE_ROOT=/Volumes/BAR\ PLUS/Local-Hermes-Portable sentinel --verify-only
+HERMES_USB_TARGET=/Volumes/BAR\ PLUS hermes-usb --verify-only
+HERMES_USB_NOTIFY=0 sentinel
 ```
 
 ## Radio & SDR

@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# Locate and launch a USB-hosted Local-Hermes-Portable install.
-# Designed for Samsung BAR Plus 128GB USB drives, but works with any mounted
-# drive containing Local-Hermes-Portable/{linux.sh,mac.sh,hermes/launch.sh}.
-#
-# v2.0 — Dynamic USB detection via lsblk/findmnt; no longer relies on
-# hardcoded drive labels. Works on any Linux or macOS system regardless
-# of the USB drive's volume name.
+# Locate, bootstrap, verify, and launch a USB-hosted Local-Hermes-Portable install.
+# Works on Linux and macOS. Intended command aliases: sentinel and hermes-usb.
 
 set -Eeuo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-VERSION="2.0.0"
+VERSION="3.0.0"
+PORTABLE_REPO_URL="${HERMES_PORTABLE_REPO_URL:-https://github.com/techjarves/Local-Hermes-Portable.git}"
+PORTABLE_ARCHIVE_URL="${HERMES_PORTABLE_ARCHIVE_URL:-https://github.com/techjarves/Local-Hermes-Portable/archive/refs/heads/main.tar.gz}"
+PORTABLE_DIR_NAME="${HERMES_PORTABLE_DIR_NAME:-Local-Hermes-Portable}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -25,21 +23,38 @@ usage() {
   cat <<'USAGE'
 Usage: hermes-portable-usb.sh [options] [-- extra hermes args]
 
-Locates a mounted Local-Hermes-Portable USB drive, verifies the portable Hermes
-launcher is present, prints a terminal banner, optionally sends a Telegram
-health report, then starts portable Hermes.
+Finds a mounted Local-Hermes-Portable USB on Linux/macOS. If the USB is mounted
+but Local-Hermes-Portable is missing, it bootstraps it from:
+  https://github.com/techjarves/Local-Hermes-Portable
+
+Then it verifies the portable Hermes launcher, prints the SENTINEL ONLINE /
+Welcome Back Sir banner, optionally sends a Telegram health report, and starts
+portable Hermes via hermes/launch.sh. That launch.sh performs first-run Hermes
+runtime setup inside the portable folder.
 
 Options:
-  --find-only                 Print the detected Local-Hermes-Portable root and exit.
-  --verify-only               Locate and verify, send health report if configured, do not launch.
-  --launcher                  Run the platform launcher (linux.sh/mac.sh) instead of hermes/launch.sh.
-  --root PATH                 Use a known Local-Hermes-Portable root path.
+  --find-only                 Print detected Local-Hermes-Portable root and exit.
+  --verify-only               Locate/bootstrap and verify, but do not launch Hermes.
+  --launcher                  Run platform launcher linux.sh/mac.sh instead of hermes/launch.sh.
+  --root PATH                 Use known Local-Hermes-Portable root, or a USB mount root
+                              where Local-Hermes-Portable should be installed.
+  --target PATH               USB mount root to bootstrap into if portable root is missing.
+  --no-bootstrap              Do not clone/download Local-Hermes-Portable when absent.
   --no-telegram               Do not attempt Telegram notification.
   --quiet                     Reduce terminal output.
   -h, --help                  Show this help.
 
+Aliases expected in bash_aliases:
+  sentinel
+  hermes-usb
+  hermesusb       legacy compatibility
+
 Environment:
-  HERMES_PORTABLE_ROOT        Known Local-Hermes-Portable root path.
+  HERMES_PORTABLE_ROOT        Known Local-Hermes-Portable root or USB mount root.
+  HERMES_USB_TARGET           USB mount root for bootstrapping.
+  HERMES_USB_MOUNT_ROOTS      Colon-separated extra mount roots to scan, useful for tests.
+  HERMES_PORTABLE_REPO_URL    Override git repo URL.
+  HERMES_PORTABLE_ARCHIVE_URL Override fallback tar.gz archive URL.
   HERMES_USB_TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_TOKEN
   HERMES_USB_TELEGRAM_CHAT_ID  / TELEGRAM_CHAT_ID
   HERMES_USB_NOTIFY=0         Disable Telegram notification.
@@ -55,8 +70,6 @@ warn() { printf '%b\n' "${YELLOW}[warn]${NC} $*" >&2; }
 fail() { printf '%b\n' "${RED}[error]${NC} $*" >&2; exit 1; }
 
 abs_path() {
-  # realpath is not guaranteed on older macOS; Python is usually available on
-  # systems that can run Hermes. Fall back to a physical cd/pwd combination.
   if command -v realpath >/dev/null 2>&1; then
     realpath "$1" 2>/dev/null && return 0
   fi
@@ -66,13 +79,11 @@ abs_path() {
   if [ -d "$1" ]; then
     (cd "$1" && pwd -P) 2>/dev/null && return 0
   fi
-  # Last resort: resolve relative to parent
-  local dir
+  local dir base resolved
   dir="$(dirname "$1" 2>/dev/null)"
-  local base
   base="$(basename "$1" 2>/dev/null)"
   if [ -d "$dir" ]; then
-    (cd "$dir" && pwd -P 2>/dev/null) && printf '/%s\n' "$base" && return 0
+    resolved="$(cd "$dir" && pwd -P 2>/dev/null)" && printf '%s/%s\n' "$resolved" "$base" && return 0
   fi
   printf '%s\n' "$1"
 }
@@ -82,57 +93,54 @@ is_portable_root() {
   [ -d "$root" ] || return 1
   { [ -f "$root/linux.sh" ] || [ -f "$root/mac.sh" ]; } || return 1
   [ -d "$root/hermes" ] || return 1
+  [ -f "$root/hermes/launch.sh" ] || return 1
 }
 
-# --- Dynamic USB mountpoint discovery ---
+split_extra_mount_roots() {
+  [ -n "${HERMES_USB_MOUNT_ROOTS:-}" ] || return 0
+  printf '%s' "$HERMES_USB_MOUNT_ROOTS" | tr ':' '\n' | awk 'NF'
+}
 
-# Strategy 1: lsblk (Linux) — find mounted USB block devices.
 lsblk_usb_mounts() {
   command -v lsblk >/dev/null 2>&1 || return 1
-  # TRAN=usb catches USB-attached drives (including NVMe/USB enclosures).
-  # TYPE=part ensures we only check partition mountpoints, not the raw disk.
   lsblk -o MOUNTPOINT,TRAN,TYPE --noheadings --list 2>/dev/null | \
-    awk '$2 == "usb" && $3 == "part" && $1 != "" {print $1}' | \
-    sort -u
+    awk '$2 == "usb" && ($3 == "part" || $3 == "disk") && $1 != "" {print $1}' | sort -u
 }
 
-# Strategy 2: findmnt (Linux) — alternative when lsblk is unavailable.
 findmnt_usb_mounts() {
   command -v findmnt >/dev/null 2>&1 || return 1
-  # Match mountpoints under /media/ or /mnt/ that are on /dev/sd* or /dev/nvme*
   findmnt -o TARGET,SOURCE --noheadings --list 2>/dev/null | \
-    awk '$2 ~ /^\/dev\/(sd|nvme)/ && $1 ~ /^\/(media|mnt|run\/media)/ {print $1}' | \
-    sort -u
+    awk '$2 ~ /^\/dev\/(sd|nvme|disk)/ && $1 ~ /^\/(media|mnt|run\/media)/ {print $1}' | sort -u
 }
 
-# Strategy 3: diskutil (macOS) — list mounted external volumes.
 diskutil_usb_mounts() {
   command -v diskutil >/dev/null 2>&1 || return 1
   diskutil list -plist external 2>/dev/null | \
-    grep -o '<string>/Volumes/[^<]*</string>' | \
-    sed 's/<[^>]*>//g' | sort -u
+    grep -o '<string>/Volumes/[^<]*</string>' | sed 's/<[^>]*>//g' | sort -u
 }
 
-# Strategy 4: scan common mount roots (fallback for systems without any of the above).
 common_mount_roots() {
   [ -n "${USER:-}" ] && printf '/media/%s\n/run/media/%s\n' "$USER" "$USER"
   printf '/media\n/mnt\n/Volumes\n'
 }
 
-# --- Core detection ---
+parent_candidates_from_path() {
+  local path="$1" dir
+  dir="$(abs_path "$path")"
+  [ -f "$dir" ] && dir="$(dirname "$dir")"
+  while [ "$dir" != "/" ] && [ -n "$dir" ]; do
+    printf '%s\n' "$dir"
+    dir="$(dirname "$dir")"
+  done
+}
 
-candidate_mount_roots() {
-  [ -n "${HERMES_PORTABLE_ROOT:-}" ] && printf '%s\n' "$HERMES_PORTABLE_ROOT"
-  [ -n "${PWD:-}" ] && parent_candidates_from_path "$PWD"
+usb_mount_roots() {
+  split_extra_mount_roots
+  [ -n "${HERMES_USB_TARGET:-}" ] && printf '%s\n' "$HERMES_USB_TARGET"
+  lsblk_usb_mounts || true
+  findmnt_usb_mounts || true
+  diskutil_usb_mounts || true
 
-  # Dynamic USB detection — works regardless of drive label.
-  local mounts
-  mounts="$(lsblk_usb_mounts || findmnt_usb_mounts || diskutil_usb_mounts || true)"
-  if [ -n "$mounts" ]; then
-    printf '%s\n' "$mounts"
-  fi
-
-  # Static fallback paths (kept for systems without lsblk/findmnt/diskutil).
   [ -n "${USER:-}" ] && {
     printf '/media/%s/Samsung USB\n' "$USER"
     printf '/media/%s/SAMSUNG\n' "$USER"
@@ -144,15 +152,24 @@ candidate_mount_roots() {
   printf '/Volumes/Samsung USB\n/Volumes/SAMSUNG\n/Volumes/BAR PLUS\n'
 }
 
-parent_candidates_from_path() {
-  local path="$1"
-  local dir
-  dir="$(abs_path "$path")"
-  [ -f "$dir" ] && dir="$(dirname "$dir")"
-  while [ "$dir" != "/" ] && [ -n "$dir" ]; do
-    printf '%s\n' "$dir"
-    dir="$(dirname "$dir")"
-  done
+candidate_roots_for_existing_install() {
+  [ -n "${HERMES_PORTABLE_ROOT:-}" ] && printf '%s\n' "$HERMES_PORTABLE_ROOT"
+  [ -n "${PWD:-}" ] && parent_candidates_from_path "$PWD"
+  usb_mount_roots
+}
+
+portable_root_under() {
+  local candidate="$1"
+  candidate="${candidate%/}"
+  if is_portable_root "$candidate"; then
+    abs_path "$candidate"
+    return 0
+  fi
+  if is_portable_root "$candidate/$PORTABLE_DIR_NAME"; then
+    abs_path "$candidate/$PORTABLE_DIR_NAME"
+    return 0
+  fi
+  return 1
 }
 
 find_portable_root() {
@@ -160,32 +177,91 @@ find_portable_root() {
 
   while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
-    candidate="${candidate%/}"
     [ -e "$candidate" ] || continue
+    portable_root_under "$candidate" && return 0
+  done < <(candidate_roots_for_existing_install | awk '!seen[$0]++')
 
-    if is_portable_root "$candidate"; then
-      abs_path "$candidate"
-      return 0
-    fi
-    if is_portable_root "$candidate/Local-Hermes-Portable"; then
-      abs_path "$candidate/Local-Hermes-Portable"
-      return 0
-    fi
-  done < <(candidate_mount_roots | awk '!seen[$0]++')
-
-  # Last resort: search only removable-media roots, not the whole filesystem.
-  # Check both the root directory AND Local-Hermes-Portable subdirectory.
   while IFS= read -r base; do
     [ -d "$base" ] || continue
-    found="$(find "$base" \( -name .Spotlight-V100 -o -name .Trashes -o -name .fseventsd \) -prune -o \( -type f \( -name linux.sh -o -name mac.sh \) -path '*/Local-Hermes-Portable/*' -o -type f \( -name linux.sh -o -name mac.sh \) -maxdepth 2 \) -print 2>/dev/null | head -n 1 || true)"
+    found="$(find "$base" \
+      \( -name .Spotlight-V100 -o -name .Trashes -o -name .fseventsd -o -name .git \) -prune -o \
+      -type f \( -name linux.sh -o -name mac.sh \) \
+      -path "*/$PORTABLE_DIR_NAME/*" -print 2>/dev/null | head -n 1 || true)"
     if [ -n "$found" ]; then
-      # Found a launcher script — return its parent directory
-      abs_path "$(dirname "$found")"
-      return 0
+      portable_root_under "$(dirname "$found")" && return 0
     fi
   done < <(common_mount_roots | awk '!seen[$0]++')
 
   return 1
+}
+
+bootstrap_target_root() {
+  local candidate
+
+  if [ -n "${HERMES_USB_TARGET:-}" ]; then
+    printf '%s\n' "$HERMES_USB_TARGET"
+    return 0
+  fi
+
+  if [ -n "${HERMES_PORTABLE_ROOT:-}" ]; then
+    if [ "$(basename "${HERMES_PORTABLE_ROOT%/}")" = "$PORTABLE_DIR_NAME" ]; then
+      dirname "${HERMES_PORTABLE_ROOT%/}"
+    else
+      printf '%s\n' "$HERMES_PORTABLE_ROOT"
+    fi
+    return 0
+  fi
+
+  while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    [ -d "$candidate" ] || continue
+    [ -w "$candidate" ] || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done < <(usb_mount_roots | awk '!seen[$0]++')
+
+  return 1
+}
+
+bootstrap_portable_root() {
+  [ "${NO_BOOTSTRAP:-0}" = "1" ] && return 1
+
+  local target install_dir tmp_archive extracted
+  target="$(bootstrap_target_root)" || return 1
+  target="$(abs_path "$target")"
+  [ -d "$target" ] || fail "Bootstrap target is not a directory: $target"
+  [ -w "$target" ] || fail "Bootstrap target is not writable: $target"
+
+  if [ "$(basename "${target%/}")" = "$PORTABLE_DIR_NAME" ]; then
+    install_dir="$target"
+  else
+    install_dir="$target/$PORTABLE_DIR_NAME"
+  fi
+
+  if [ -e "$install_dir" ] && ! is_portable_root "$install_dir"; then
+    fail "Refusing to overwrite existing non-portable path: $install_dir"
+  fi
+  if is_portable_root "$install_dir"; then
+    abs_path "$install_dir"
+    return 0
+  fi
+
+  printf '%b\n' "${YELLOW}[setup]${NC} Local-Hermes-Portable not found; installing into $install_dir" >&2
+
+  if command -v git >/dev/null 2>&1; then
+    git clone --depth 1 "$PORTABLE_REPO_URL" "$install_dir"
+  elif command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+    tmp_archive="$(mktemp)"
+    curl -fsSL "$PORTABLE_ARCHIVE_URL" -o "$tmp_archive"
+    mkdir -p "$install_dir"
+    tar -xzf "$tmp_archive" -C "$install_dir" --strip-components=1
+    rm -f "$tmp_archive"
+  else
+    fail "Need git, or curl+tar, to install Local-Hermes-Portable. Install one of those or pre-load the USB."
+  fi
+
+  is_portable_root "$install_dir" || fail "Install completed but $install_dir does not look like Local-Hermes-Portable."
+  abs_path "$install_dir"
 }
 
 platform_launcher() {
@@ -197,6 +273,11 @@ platform_launcher() {
   [ -f "$root/linux.sh" ] && printf '%s\n' "$root/linux.sh" && return 0
   [ -f "$root/mac.sh" ] && printf '%s\n' "$root/mac.sh" && return 0
   return 1
+}
+
+ensure_executable_bits() {
+  local root="$1"
+  chmod +x "$root/linux.sh" "$root/mac.sh" "$root/hermes/launch.sh" 2>/dev/null || true
 }
 
 load_telegram_env() {
@@ -222,7 +303,7 @@ load_telegram_env() {
 }
 
 health_report() {
-  local root="$1" launcher="$2" os host arch uptime_text disk_text usb_disk mem_text ip_text
+  local root="$1" launcher="$2" os host arch uptime_text disk_text usb_disk mem_text ip_text ready_flag config_file
   os="$(uname -s 2>/dev/null || printf unknown)"
   host="$(hostname 2>/dev/null || scutil --get ComputerName 2>/dev/null || printf unknown)"
   arch="$(uname -m 2>/dev/null || printf unknown)"
@@ -237,6 +318,8 @@ health_report() {
     mem_text="unknown"
   fi
   ip_text="$( (hostname -I 2>/dev/null || ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || printf unknown) | awk '{print $1}' )"
+  ready_flag="$(find "$root/hermes/.cache/runtimes" -name ready.flag -print 2>/dev/null | head -n 1 || true)"
+  config_file="$root/hermes/data/config.yaml"
 
   cat <<REPORT
 SENTINEL ONLINE
@@ -251,8 +334,10 @@ Portable Hermes health status:
 - Disk: $disk_text
 - USB: $usb_disk
 - Portable root: $root
-- Launcher: $launcher
+- Platform launcher: $launcher
 - Hermes launch.sh: $([ -f "$root/hermes/launch.sh" ] && printf present || printf missing)
+- Hermes config: $([ -f "$config_file" ] && printf present || printf missing)
+- Runtime ready flag: $([ -n "$ready_flag" ] && printf 'present (%s)' "$ready_flag" || printf 'not built yet')
 REPORT
 }
 
@@ -298,6 +383,7 @@ VERIFY_ONLY=0
 FIND_ONLY=0
 USE_PLATFORM_LAUNCHER=0
 NO_TELEGRAM=0
+NO_BOOTSTRAP=0
 QUIET=0
 ROOT_ARG=""
 EXTRA_ARGS=()
@@ -306,8 +392,10 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --find-only) FIND_ONLY=1 ;;
     --verify-only) VERIFY_ONLY=1 ;;
-    --launcher) USE_PLATFORM_LAUNCHER=1 ;;
+    --launcher|--platform-launcher|--platform-setup) USE_PLATFORM_LAUNCHER=1 ;;
     --root) shift; ROOT_ARG="${1:-}" ;;
+    --target) shift; HERMES_USB_TARGET="${1:-}" ;;
+    --no-bootstrap) NO_BOOTSTRAP=1 ;;
     --no-telegram) NO_TELEGRAM=1 ;;
     --quiet) QUIET=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -322,16 +410,14 @@ if [ -n "$ROOT_ARG" ]; then
   HERMES_PORTABLE_ROOT="$ROOT_ARG"
 fi
 
-ROOT="$(find_portable_root)" || fail "Local-Hermes-Portable USB root was not found. Plug in the Samsung BAR Plus drive or pass --root PATH."
+ROOT="$(find_portable_root || bootstrap_portable_root)" || fail "Local-Hermes-Portable was not found and could not be bootstrapped. Plug in the USB, pass --root/--target, or pre-load the drive."
 [ "$FIND_ONLY" = "1" ] && { printf '%s\n' "$ROOT"; exit 0; }
 
 is_portable_root "$ROOT" || fail "Detected path is not a valid Local-Hermes-Portable root: $ROOT"
-LAUNCHER="$(platform_launcher "$ROOT")" || fail "No platform launcher found under $ROOT"
+ensure_executable_bits "$ROOT"
+LAUNCHER="$(platform_launcher "$ROOT")" || fail "No linux.sh/mac.sh launcher found under $ROOT"
 HERMES_LAUNCH="$ROOT/hermes/launch.sh"
-
-if [ ! -f "$HERMES_LAUNCH" ]; then
-  fail "Hermes launcher missing: $HERMES_LAUNCH"
-fi
+[ -f "$HERMES_LAUNCH" ] || fail "Hermes launcher missing: $HERMES_LAUNCH"
 
 print_banner
 REPORT="$(health_report "$ROOT" "$LAUNCHER")"
