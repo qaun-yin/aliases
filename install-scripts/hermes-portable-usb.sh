@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Locate, bootstrap, verify, and launch a USB-hosted Local-Hermes-Portable install.
-# Works on Linux and macOS. Intended command aliases: sentinel and hermes-usb.
+# Works on Linux, macOS, and WSL2. Intended command aliases: sentinel and hermes-usb.
 
 set -Eeuo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-VERSION="3.0.0"
+VERSION="3.1.0"
 PORTABLE_REPO_URL="${HERMES_PORTABLE_REPO_URL:-https://github.com/techjarves/Local-Hermes-Portable.git}"
 PORTABLE_ARCHIVE_URL="${HERMES_PORTABLE_ARCHIVE_URL:-https://github.com/techjarves/Local-Hermes-Portable/archive/refs/heads/main.tar.gz}"
 PORTABLE_DIR_NAME="${HERMES_PORTABLE_DIR_NAME:-Local-Hermes-Portable}"
@@ -103,20 +103,86 @@ split_extra_mount_roots() {
 
 lsblk_usb_mounts() {
   command -v lsblk >/dev/null 2>&1 || return 1
-  lsblk -o MOUNTPOINT,TRAN,TYPE --noheadings --list 2>/dev/null | \
-    awk '$2 == "usb" && ($3 == "part" || $3 == "disk") && $1 != "" {print $1}' | sort -u
+  # Try TRAN=usb first (modern lsblk). If TRAN column is empty (older lsblk,
+  # or some Pi OS builds), fall back to matching any non-root block device
+  # mountpoint that isn't a loop or tmpfs.
+  local mounts
+  mounts="$(lsblk -o MOUNTPOINT,TRAN,TYPE --noheadings --list 2>/dev/null | \
+    awk '$2 == "usb" && ($3 == "part" || $3 == "disk") && $1 != "" {print $1}')"
+  if [ -n "$mounts" ]; then
+    printf '%s\n' "$mounts" | sort -u
+    return 0
+  fi
+  # Fallback: TRAN column empty — match any non-root, non-loop partition mount.
+  lsblk -o MOUNTPOINT,TYPE --noheadings --list 2>/dev/null | \
+    awk '$1 != "" && $1 != "/" && $2 == "part" {print $1}' | sort -u
 }
 
 findmnt_usb_mounts() {
   command -v findmnt >/dev/null 2>&1 || return 1
+  # Match mountpoints on removable block devices (sd*, nvme*, mmcblk*, xvd*).
+  # Do not restrict target path — some systems mount USB at arbitrary locations.
   findmnt -o TARGET,SOURCE --noheadings --list 2>/dev/null | \
-    awk '$2 ~ /^\/dev\/(sd|nvme|disk)/ && $1 ~ /^\/(media|mnt|run\/media)/ {print $1}' | sort -u
+    awk '$2 ~ /^\/dev\/(sd|nvme|mmcblk|xvd|vd)/ && $1 != "/" && $1 !~ /^\/mnt\/wsl/ {print $1}' | sort -u
+}
+
+# Read the kernel's removable flag for each block device.
+# Works on every Linux kernel regardless of architecture (Pi, x86, ARM).
+removable_block_devices() {
+  local dev removable
+  for dev in /sys/block/*/removable; do
+    [ -f "$dev" ] || continue
+    read -r removable < "$dev" 2>/dev/null || continue
+    [ "$removable" = "1" ] || continue
+    # Get the device name from the path
+    dev="${dev%/removable}"
+    dev="${dev##/sys/block/}"
+    printf '%s\n' "$dev"
+  done
+}
+
+# Find mountpoints of removable block devices by cross-referencing
+# /sys/block/*/removable with /proc/mounts or findmnt.
+removable_mounts() {
+  local devs dev mountpoint
+  devs="$(removable_block_devices)" || return 1
+  [ -n "$devs" ] || return 1
+
+  # Use /proc/mounts for reliable device-to-mountpoint mapping
+  while IFS= read -r dev; do
+    while IFS=' ' read -r device mountpoint rest; do
+      case "$device" in
+        /dev/$dev*)
+          [ -n "$mountpoint" ] && [ "$mountpoint" != "/" ] && printf '%s\n' "$mountpoint"
+          ;;
+      esac
+    done < /proc/mounts
+  done <<< "$devs" | sort -u
 }
 
 diskutil_usb_mounts() {
   command -v diskutil >/dev/null 2>&1 || return 1
   diskutil list -plist external 2>/dev/null | \
     grep -o '<string>/Volumes/[^<]*</string>' | sed 's/<[^>]*>//g' | sort -u
+}
+
+# WSL2 detection: check for the WSL interop marker.
+is_wsl2() {
+  [ -f /proc/sys/fs/binfmt_misc/WSLInterop ] && return 0
+  [ -d /mnt/wsl ] && return 0
+  return 1
+}
+
+# WSL2: Windows drives mount under /mnt/[a-z]/ via 9p.
+# Exclude /mnt/wsl and /mnt/wslg (WSL internal mounts).
+wsl2_mount_roots() {
+  is_wsl2 || return 1
+  local letter
+  for letter in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+    if [ -d "/mnt/$letter" ]; then
+      printf '/mnt/%s\n' "$letter"
+    fi
+  done
 }
 
 common_mount_roots() {
@@ -139,7 +205,9 @@ usb_mount_roots() {
   [ -n "${HERMES_USB_TARGET:-}" ] && printf '%s\n' "$HERMES_USB_TARGET"
   lsblk_usb_mounts || true
   findmnt_usb_mounts || true
+  removable_mounts || true
   diskutil_usb_mounts || true
+  wsl2_mount_roots || true
 
   [ -n "${USER:-}" ] && {
     printf '/media/%s/Samsung USB\n' "$USER"
@@ -183,10 +251,15 @@ find_portable_root() {
 
   while IFS= read -r base; do
     [ -d "$base" ] || continue
+    # Skip WSL internal mounts — they're huge and never contain the portable root.
+    case "$base" in
+      /mnt/wsl|/mnt/wslg|/mnt/wsl/*|/mnt/wslg/*) continue ;;
+    esac
     found="$(find "$base" \
       \( -name .Spotlight-V100 -o -name .Trashes -o -name .fseventsd -o -name .git \) -prune -o \
-      -type f \( -name linux.sh -o -name mac.sh \) \
-      -path "*/$PORTABLE_DIR_NAME/*" -print 2>/dev/null | head -n 1 || true)"
+      \( -type f \( -name linux.sh -o -name mac.sh \) -path "*/$PORTABLE_DIR_NAME/*" -o \
+         -type f \( -name linux.sh -o -name mac.sh \) -maxdepth 2 \) \
+      -print 2>/dev/null | head -n 1 || true)"
     if [ -n "$found" ]; then
       portable_root_under "$(dirname "$found")" && return 0
     fi
@@ -216,6 +289,8 @@ bootstrap_target_root() {
     [ -n "$candidate" ] || continue
     [ -d "$candidate" ] || continue
     [ -w "$candidate" ] || continue
+    # Skip Windows system drive (C:) in WSL2 — never bootstrap there.
+    [ "$candidate" = "/mnt/c" ] && continue
     printf '%s\n' "$candidate"
     return 0
   done < <(usb_mount_roots | awk '!seen[$0]++')
