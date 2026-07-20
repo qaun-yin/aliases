@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-VERSION="3.3.0"
+VERSION="3.3.1"
 PORTABLE_REPO_URL="${HERMES_PORTABLE_REPO_URL:-https://github.com/techjarves/Local-Hermes-Portable.git}"
 PORTABLE_ARCHIVE_URL="${HERMES_PORTABLE_ARCHIVE_URL:-https://github.com/techjarves/Local-Hermes-Portable/archive/refs/heads/main.tar.gz}"
 PORTABLE_DIR_NAME="${HERMES_PORTABLE_DIR_NAME:-Local-Hermes-Portable}"
@@ -197,11 +197,25 @@ mount_removable_drive() {
         fi
         mountpoint="/media/${USER:-root}/$label"
         if [ ! -d "$mountpoint" ]; then
-          mkdir -p "$mountpoint" 2>/dev/null || continue
+          mkdir -p "$mountpoint" 2>/dev/null || {
+            # mkdir failed — try with sudo
+            if command -v sudo >/dev/null 2>&1; then
+              sudo mkdir -p "$mountpoint" 2>/dev/null || continue
+            else
+              continue
+            fi
+          }
         fi
         if mount --bind "$existing_mount" "$mountpoint" 2>/dev/null; then
           printf '%s\n' "$mountpoint"
           return 0
+        fi
+        # Bind mount failed — try with sudo
+        if command -v sudo >/dev/null 2>&1; then
+          if sudo mount --bind "$existing_mount" "$mountpoint" 2>/dev/null; then
+            printf '%s\n' "$mountpoint"
+            return 0
+          fi
         fi
         # Bind mount failed — try a fresh mount (may require sudo)
         if mount "/dev/$part_name" "$mountpoint" 2>/dev/null; then
@@ -229,10 +243,25 @@ mount_removable_drive() {
         label="usb-$part_name"
       fi
       mountpoint="/media/${USER:-root}/$label"
-      mkdir -p "$mountpoint" 2>/dev/null || continue
+      mkdir -p "$mountpoint" 2>/dev/null || {
+        if command -v sudo >/dev/null 2>&1; then
+          sudo mkdir -p "$mountpoint" 2>/dev/null || continue
+        else
+          continue
+        fi
+      }
       if mount "/dev/$part_name" "$mountpoint" 2>/dev/null; then
         printf '%s\n' "$mountpoint"
         return 0
+      fi
+      # Regular mount failed — try with sudo (user may have passwordless sudo)
+      if command -v sudo >/dev/null 2>&1; then
+        if sudo mount "/dev/$part_name" "$mountpoint" 2>/dev/null; then
+          # Ensure the current user can access the mountpoint
+          sudo chmod 755 "$mountpoint" 2>/dev/null || true
+          printf '%s\n' "$mountpoint"
+          return 0
+        fi
       fi
       rmdir "$mountpoint" 2>/dev/null || true
     done
