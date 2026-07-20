@@ -2,11 +2,15 @@
 # Locate and launch a USB-hosted Local-Hermes-Portable install.
 # Designed for Samsung BAR Plus 128GB USB drives, but works with any mounted
 # drive containing Local-Hermes-Portable/{linux.sh,mac.sh,hermes/launch.sh}.
+#
+# v2.0 — Dynamic USB detection via lsblk/findmnt; no longer relies on
+# hardcoded drive labels. Works on any Linux or macOS system regardless
+# of the USB drive's volume name.
 
 set -Eeuo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
-VERSION="1.0.0"
+VERSION="2.0.0"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -59,7 +63,18 @@ abs_path() {
   if command -v python3 >/dev/null 2>&1; then
     python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$1" && return 0
   fi
-  (cd "$(dirname "$1")" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$1")")
+  if [ -d "$1" ]; then
+    (cd "$1" && pwd -P) 2>/dev/null && return 0
+  fi
+  # Last resort: resolve relative to parent
+  local dir
+  dir="$(dirname "$1" 2>/dev/null)"
+  local base
+  base="$(basename "$1" 2>/dev/null)"
+  if [ -d "$dir" ]; then
+    (cd "$dir" && pwd -P 2>/dev/null) && printf '/%s\n' "$base" && return 0
+  fi
+  printf '%s\n' "$1"
 }
 
 is_portable_root() {
@@ -67,6 +82,66 @@ is_portable_root() {
   [ -d "$root" ] || return 1
   { [ -f "$root/linux.sh" ] || [ -f "$root/mac.sh" ]; } || return 1
   [ -d "$root/hermes" ] || return 1
+}
+
+# --- Dynamic USB mountpoint discovery ---
+
+# Strategy 1: lsblk (Linux) — find mounted USB block devices.
+lsblk_usb_mounts() {
+  command -v lsblk >/dev/null 2>&1 || return 1
+  # TRAN=usb catches USB-attached drives (including NVMe/USB enclosures).
+  # TYPE=part ensures we only check partition mountpoints, not the raw disk.
+  lsblk -o MOUNTPOINT,TRAN,TYPE --noheadings --list 2>/dev/null | \
+    awk '$2 == "usb" && $3 == "part" && $1 != "" {print $1}' | \
+    sort -u
+}
+
+# Strategy 2: findmnt (Linux) — alternative when lsblk is unavailable.
+findmnt_usb_mounts() {
+  command -v findmnt >/dev/null 2>&1 || return 1
+  # Match mountpoints under /media/ or /mnt/ that are on /dev/sd* or /dev/nvme*
+  findmnt -o TARGET,SOURCE --noheadings --list 2>/dev/null | \
+    awk '$2 ~ /^\/dev\/(sd|nvme)/ && $1 ~ /^\/(media|mnt|run\/media)/ {print $1}' | \
+    sort -u
+}
+
+# Strategy 3: diskutil (macOS) — list mounted external volumes.
+diskutil_usb_mounts() {
+  command -v diskutil >/dev/null 2>&1 || return 1
+  diskutil list -plist external 2>/dev/null | \
+    grep -o '<string>/Volumes/[^<]*</string>' | \
+    sed 's/<[^>]*>//g' | sort -u
+}
+
+# Strategy 4: scan common mount roots (fallback for systems without any of the above).
+common_mount_roots() {
+  [ -n "${USER:-}" ] && printf '/media/%s\n/run/media/%s\n' "$USER" "$USER"
+  printf '/media\n/mnt\n/Volumes\n'
+}
+
+# --- Core detection ---
+
+candidate_mount_roots() {
+  [ -n "${HERMES_PORTABLE_ROOT:-}" ] && printf '%s\n' "$HERMES_PORTABLE_ROOT"
+  [ -n "${PWD:-}" ] && parent_candidates_from_path "$PWD"
+
+  # Dynamic USB detection — works regardless of drive label.
+  local mounts
+  mounts="$(lsblk_usb_mounts || findmnt_usb_mounts || diskutil_usb_mounts || true)"
+  if [ -n "$mounts" ]; then
+    printf '%s\n' "$mounts"
+  fi
+
+  # Static fallback paths (kept for systems without lsblk/findmnt/diskutil).
+  [ -n "${USER:-}" ] && {
+    printf '/media/%s/Samsung USB\n' "$USER"
+    printf '/media/%s/SAMSUNG\n' "$USER"
+    printf '/media/%s/BAR PLUS\n' "$USER"
+    printf '/run/media/%s/Samsung USB\n' "$USER"
+    printf '/run/media/%s/SAMSUNG\n' "$USER"
+    printf '/run/media/%s/BAR PLUS\n' "$USER"
+  }
+  printf '/Volumes/Samsung USB\n/Volumes/SAMSUNG\n/Volumes/BAR PLUS\n'
 }
 
 parent_candidates_from_path() {
@@ -78,29 +153,6 @@ parent_candidates_from_path() {
     printf '%s\n' "$dir"
     dir="$(dirname "$dir")"
   done
-}
-
-candidate_mount_roots() {
-  [ -n "${HERMES_PORTABLE_ROOT:-}" ] && printf '%s\n' "$HERMES_PORTABLE_ROOT"
-  [ -n "${PWD:-}" ] && parent_candidates_from_path "$PWD"
-
-  # Common Linux mount points.
-  [ -n "${USER:-}" ] && printf '/media/%s\n/run/media/%s\n' "$USER" "$USER"
-  printf '/media\n/mnt\n'
-
-  # macOS external volumes.
-  printf '/Volumes\n'
-
-  # Common Samsung BAR Plus labels seen after formatting or user renaming.
-  [ -n "${USER:-}" ] && {
-    printf '/media/%s/Samsung USB\n' "$USER"
-    printf '/media/%s/SAMSUNG\n' "$USER"
-    printf '/media/%s/BAR PLUS\n' "$USER"
-    printf '/run/media/%s/Samsung USB\n' "$USER"
-    printf '/run/media/%s/SAMSUNG\n' "$USER"
-    printf '/run/media/%s/BAR PLUS\n' "$USER"
-  }
-  printf '/Volumes/Samsung USB\n/Volumes/SAMSUNG\n/Volumes/BAR PLUS\n'
 }
 
 find_portable_root() {
@@ -122,14 +174,16 @@ find_portable_root() {
   done < <(candidate_mount_roots | awk '!seen[$0]++')
 
   # Last resort: search only removable-media roots, not the whole filesystem.
+  # Check both the root directory AND Local-Hermes-Portable subdirectory.
   while IFS= read -r base; do
     [ -d "$base" ] || continue
-    found="$(find "$base" \( -name .Spotlight-V100 -o -name .Trashes -o -name .fseventsd \) -prune -o -type f \( -name linux.sh -o -name mac.sh \) -path '*/Local-Hermes-Portable/*' -print 2>/dev/null | head -n 1 || true)"
+    found="$(find "$base" \( -name .Spotlight-V100 -o -name .Trashes -o -name .fseventsd \) -prune -o \( -type f \( -name linux.sh -o -name mac.sh \) -path '*/Local-Hermes-Portable/*' -o -type f \( -name linux.sh -o -name mac.sh \) -maxdepth 2 \) -print 2>/dev/null | head -n 1 || true)"
     if [ -n "$found" ]; then
+      # Found a launcher script — return its parent directory
       abs_path "$(dirname "$found")"
       return 0
     fi
-  done < <(printf '%s\n' "/media/${USER:-}" "/run/media/${USER:-}" /media /mnt /Volumes | awk '!seen[$0]++')
+  done < <(common_mount_roots | awk '!seen[$0]++')
 
   return 1
 }
